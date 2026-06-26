@@ -109,7 +109,7 @@ export default function Projects({
               />
             </div>
             <div>
-              <label className="small">Repositorio (usuario/repo)</label>
+              <label className="small">Repositorio (organización/repo)</label>
               <input
                 value={repo}
                 onChange={(e) => setRepo(e.target.value)}
