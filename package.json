@@ -6,7 +6,7 @@
   "author": "Work Tracker",
   "license": "MIT",
   "scripts": {
-    "dev": "concurrently \"npm run dev:vite\" \"npm run build:electron && wait-on http://localhost:5173 && npm run dev:electron\"",
+    "dev": "concurrently \"npm run dev:vite\" \"npm run build:electron && wait-on http://localhost:5170 && npm run dev:electron\"",
     "dev:vite": "vite",
     "dev:electron": "electron .",
     "build": "vite build && npm run build:electron",

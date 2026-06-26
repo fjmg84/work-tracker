@@ -5,6 +5,7 @@ import { Octokit } from "@octokit/rest";
 import fs from "fs";
 
 const isDev = process.env.NODE_ENV !== "production";
+const PORT = 5170;
 const dbPath = path.join(app.getPath("userData"), "work-tracker.db");
 const db = new Database(dbPath);
 
@@ -77,7 +78,7 @@ function createWindow(): void {
   });
 
   if (isDev) {
-    mainWindow.loadURL("http://localhost:5173");
+    mainWindow.loadURL(`http://localhost:${PORT}`);
     mainWindow.webContents.openDevTools();
   } else {
     mainWindow.loadFile(path.join(__dirname, "../../dist/index.html"));
