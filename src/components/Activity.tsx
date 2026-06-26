@@ -3,7 +3,6 @@ import {
   Project,
   GitHubActivity,
   PullRequest,
-  Commit,
   GitHubActivityError,
 } from "../types";
 
@@ -17,6 +16,17 @@ export default function Activity({ projects }: ActivityProps) {
   const [loading, setLoading] = useState<boolean>(false);
   const [result, setResult] = useState<GitHubActivity | null>(null);
   const [error, setError] = useState<string>("");
+  const [openRepos, setOpenRepos] = useState<Set<string>>(new Set());
+
+  const toggleRepo = (repo: string) => {
+    const newOpenRepos = new Set(openRepos);
+    if (newOpenRepos.has(repo)) {
+      newOpenRepos.delete(repo);
+    } else {
+      newOpenRepos.add(repo);
+    }
+    setOpenRepos(newOpenRepos);
+  };
 
   const load = async () => {
     setLoading(true);
@@ -28,11 +38,10 @@ export default function Activity({ projects }: ActivityProps) {
       const end = new Date(year, month, 0, 23, 59, 59, 999).getTime();
 
       const allPrs: (PullRequest | GitHubActivityError)[] = [];
-      const allCommits: Commit[] = [];
 
       for (const project of projects) {
         try {
-          const { prs, commits } = await window.api.github.getUserActivity({
+          const { prs } = await window.api.github.getUserActivity({
             accountId: project.account_id,
             repo: project.repo,
             since: start,
@@ -42,13 +51,6 @@ export default function Activity({ projects }: ActivityProps) {
           allPrs.push(
             ...prs.map((pr) => ({
               ...pr,
-              projectName: project.name,
-              accountLabel: project.account_label,
-            })),
-          );
-          allCommits.push(
-            ...commits.map((c) => ({
-              ...c,
               projectName: project.name,
               accountLabel: project.account_label,
             })),
@@ -63,7 +65,7 @@ export default function Activity({ projects }: ActivityProps) {
         }
       }
 
-      setResult({ prs: allPrs as PullRequest[], commits: allCommits });
+      setResult({ prs: allPrs as PullRequest[] });
     } catch (err) {
       setError((err as Error).message);
     } finally {
@@ -77,6 +79,17 @@ export default function Activity({ projects }: ActivityProps) {
   const errors = (result?.prs || []).filter(
     (p): p is GitHubActivityError => "error" in p,
   );
+
+  // Group PRs by repository
+  const groupedByRepo = new Map<string, PullRequest[]>();
+
+  prsWithoutError.forEach((pr) => {
+    const repo = `${pr.accountLabel}/${pr.html_url.split("/")[3]}/${pr.html_url.split("/")[4]}`;
+    if (!groupedByRepo.has(repo)) {
+      groupedByRepo.set(repo, []);
+    }
+    groupedByRepo.get(repo)!.push(pr);
+  });
 
   return (
     <div className="card">
@@ -133,44 +146,74 @@ export default function Activity({ projects }: ActivityProps) {
 
       {result && (
         <>
-          <div className="mt-2">
-            <h4>Pull Requests ({prsWithoutError.length})</h4>
-            {prsWithoutError.length === 0 ? (
-              <p className="empty-state">No se encontraron PRs.</p>
-            ) : (
-              prsWithoutError.map((pr) => (
-                <div key={pr.id} className="gh-item">
-                  <a href={pr.html_url} target="_blank" rel="noreferrer">
-                    #{pr.number} {pr.title}
-                  </a>
-                  <div className="gh-meta">
-                    {new Date(pr.created_at).toLocaleDateString("es-ES")} ·{" "}
-                    {pr.projectName} · {pr.accountLabel} · {pr.state}
-                  </div>
-                </div>
-              ))
-            )}
-          </div>
+          {groupedByRepo.size === 0 ? (
+            <p className="empty-state">No se encontraron PRs.</p>
+          ) : (
+            Array.from(groupedByRepo.entries()).map(([repo, prs]) => (
+              <div key={repo} className="mt-2">
+                <h4
+                  onClick={() => toggleRepo(repo)}
+                  style={{ cursor: "pointer", userSelect: "none" }}
+                >
+                  {openRepos.has(repo) ? "▼" : "▶"} {repo}
+                </h4>
 
-          <div className="mt-2">
-            <h4>Commits ({result.commits.length})</h4>
-            {result.commits.length === 0 ? (
-              <p className="empty-state">No se encontraron commits.</p>
-            ) : (
-              result.commits.map((c) => (
-                <div key={c.sha} className="gh-item">
-                  <a href={c.html_url} target="_blank" rel="noreferrer">
-                    {c.sha.substring(0, 7)}
-                  </a>{" "}
-                  {c.message}
-                  <div className="gh-meta">
-                    {new Date(c.date).toLocaleDateString("es-ES")} ·{" "}
-                    {c.projectName} · {c.accountLabel}
-                  </div>
-                </div>
-              ))
-            )}
-          </div>
+                {openRepos.has(repo) && (
+                  <>
+                    {prs.length === 0 ? (
+                      <p className="empty-state">No se encontraron PRs.</p>
+                    ) : (
+                      prs.map((pr) => (
+                        <div key={pr.id} className="mt-2">
+                          <div className="gh-item">
+                            <a
+                              href={pr.html_url}
+                              target="_blank"
+                              rel="noreferrer"
+                            >
+                              #{pr.number} {pr.title}
+                            </a>
+                            <div className="gh-meta">
+                              {new Date(pr.created_at).toLocaleDateString(
+                                "es-ES",
+                              )}{" "}
+                              · {pr.projectName} · {pr.state}
+                            </div>
+                          </div>
+
+                          {pr.commits && pr.commits.length > 0 && (
+                            <div
+                              className="mt-2"
+                              style={{ marginLeft: "20px" }}
+                            >
+                              <h6>Commits ({pr.commits.length})</h6>
+                              {pr.commits.map((c) => (
+                                <div key={c.sha} className="gh-item">
+                                  <a
+                                    href={c.html_url}
+                                    target="_blank"
+                                    rel="noreferrer"
+                                  >
+                                    {c.sha.substring(0, 7)}
+                                  </a>{" "}
+                                  {c.message}
+                                  <div className="gh-meta">
+                                    {new Date(c.date).toLocaleDateString(
+                                      "es-ES",
+                                    )}
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      ))
+                    )}
+                  </>
+                )}
+              </div>
+            ))
+          )}
         </>
       )}
     </div>

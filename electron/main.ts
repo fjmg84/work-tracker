@@ -224,9 +224,6 @@ ipcMain.handle(
     if (!owner || !repoName)
       throw new Error("El formato del repo debe ser usuario/repo.");
 
-    const sinceIso = new Date(since).toISOString();
-    const untilIso = new Date(until).toISOString();
-
     let prs: any[];
     try {
       prs = await octokit.paginate(octokit.rest.pulls.list, {
@@ -249,46 +246,58 @@ ipcMain.handle(
       .filter((pr) => {
         const created = new Date(pr.created_at).getTime();
         return created >= since && created <= until;
-      })
-      .map((pr) => ({
-        id: pr.id,
-        number: pr.number,
-        title: pr.title,
-        state: pr.state,
-        created_at: pr.created_at,
-        html_url: pr.html_url,
-        account_username: account.username,
-      }));
-
-    let commits: any[];
-    try {
-      commits = await octokit.paginate(octokit.rest.repos.listCommits, {
-        owner,
-        repo: repoName,
-        since: sinceIso,
-        until: untilIso,
-        per_page: 100,
       });
-    } catch (error: any) {
-      if (error.status === 404) {
-        throw new Error(
-          `Repositorio "${owner}/${repoName}" no encontrado. Verifica que el formato sea correcto (ej: usuario/repo) y que tengas acceso.`,
-        );
-      }
-      throw new Error(`Error al obtener commits: ${error.message}`);
-    }
 
-    const filteredCommits = commits
-      .filter((c) => c.author && c.author.login === account.username)
-      .map((c) => ({
-        sha: c.sha,
-        message: c.commit.message.split("\n")[0],
-        date: c.commit.committer?.date || "",
-        html_url: c.html_url,
-        account_username: account.username,
-      }));
+    // Get commits for each PR
+    const prsWithCommits = await Promise.all(
+      filteredPrs.map(async (pr) => {
+        try {
+          const prCommits = await octokit.paginate(
+            octokit.rest.pulls.listCommits,
+            {
+              owner,
+              repo: repoName,
+              pull_number: pr.number,
+              per_page: 100,
+            },
+          );
 
-    return { prs: filteredPrs, commits: filteredCommits };
+          const filteredPrCommits = prCommits
+            .filter((c) => c.author && c.author.login === account.username)
+            .map((c) => ({
+              sha: c.sha,
+              message: c.commit.message.split("\n")[0],
+              date: c.commit.committer?.date || "",
+              html_url: c.html_url,
+            }));
+
+          return {
+            id: pr.id,
+            number: pr.number,
+            title: pr.title,
+            state: pr.state,
+            created_at: pr.created_at,
+            html_url: pr.html_url,
+            account_username: account.username,
+            commits: filteredPrCommits,
+          };
+        } catch (error: any) {
+          console.error(`Error fetching commits for PR #${pr.number}:`, error);
+          return {
+            id: pr.id,
+            number: pr.number,
+            title: pr.title,
+            state: pr.state,
+            created_at: pr.created_at,
+            html_url: pr.html_url,
+            account_username: account.username,
+            commits: [],
+          };
+        }
+      }),
+    );
+
+    return { prs: prsWithCommits };
   },
 );
 

@@ -54,6 +54,7 @@ export interface PullRequest {
   accountLabel?: string;
   error?: boolean;
   message?: string;
+  commits?: Commit[];
 }
 
 export interface Commit {
@@ -68,7 +69,6 @@ export interface Commit {
 
 export interface GitHubActivity {
   prs: (PullRequest | GitHubActivityError)[];
-  commits: Commit[];
 }
 
 export interface GitHubActivityError {
