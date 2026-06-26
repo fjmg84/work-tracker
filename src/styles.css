@@ -177,6 +177,7 @@ input:focus, select:focus, textarea:focus {
   text-align: center;
   padding: 20px 0;
   font-style: italic;
+  list-style: none;
 }
 
 .badge {
