@@ -5,6 +5,7 @@ import {
   PullRequest,
   GitHubActivityError,
 } from "../types";
+import MonthYearSelector from "./MonthYearSelector";
 
 interface ActivityProps {
   projects: Project[];
@@ -96,27 +97,12 @@ export default function Activity({ projects }: ActivityProps) {
       <h3>Actividad de GitHub</h3>
 
       <div className="form-row">
-        <div>
-          <label className="small">Año</label>
-          <input
-            type="number"
-            value={year}
-            onChange={(e) => setYear(Number(e.target.value))}
-          />
-        </div>
-        <div>
-          <label className="small">Mes</label>
-          <select
-            value={month}
-            onChange={(e) => setMonth(Number(e.target.value))}
-          >
-            {Array.from({ length: 12 }, (_, i) => (
-              <option key={i + 1} value={i + 1}>
-                {new Date(0, i).toLocaleString("es-ES", { month: "long" })}
-              </option>
-            ))}
-          </select>
-        </div>
+        <MonthYearSelector
+          year={year}
+          month={month}
+          onYearChange={setYear}
+          onMonthChange={setMonth}
+        />
         <div>
           <button
             className="primary"

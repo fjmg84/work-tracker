@@ -7,6 +7,7 @@ import {
   Commit,
   GitHubActivityError,
 } from "../types";
+import MonthYearSelector from "./MonthYearSelector";
 
 interface ReportsProps {
   projects: Project[];
@@ -49,7 +50,7 @@ export default function Reports({ projects }: ReportsProps) {
 
     for (const project of projects) {
       try {
-        const { prs, commits } = await window.api.github.getUserActivity({
+        const { prs } = await window.api.github.getUserActivity({
           accountId: project.account_id,
           repo: project.repo,
           since: start,
@@ -62,13 +63,18 @@ export default function Reports({ projects }: ReportsProps) {
             accountLabel: project.account_label,
           })),
         );
-        allCommits.push(
-          ...commits.map((c) => ({
-            ...c,
-            projectName: project.name,
-            accountLabel: project.account_label,
-          })),
-        );
+        // Extract commits from PRs (only from non-error PRs)
+        prs.forEach((pr) => {
+          if (!("error" in pr) && pr.commits) {
+            allCommits.push(
+              ...pr.commits.map((c) => ({
+                ...c,
+                projectName: project.name,
+                accountLabel: project.account_label,
+              })),
+            );
+          }
+        });
       } catch (err) {
         console.error(`Error cargando actividad de ${project.repo}:`, err);
       }
@@ -116,27 +122,12 @@ export default function Reports({ projects }: ReportsProps) {
       <h3>Reporte mensual</h3>
 
       <div className="form-row">
-        <div>
-          <label className="small">Año</label>
-          <input
-            type="number"
-            value={year}
-            onChange={(e) => setYear(Number(e.target.value))}
-          />
-        </div>
-        <div>
-          <label className="small">Mes</label>
-          <select
-            value={month}
-            onChange={(e) => setMonth(Number(e.target.value))}
-          >
-            {Array.from({ length: 12 }, (_, i) => (
-              <option key={i + 1} value={i + 1}>
-                {i + 1}
-              </option>
-            ))}
-          </select>
-        </div>
+        <MonthYearSelector
+          year={year}
+          month={month}
+          onYearChange={setYear}
+          onMonthChange={setMonth}
+        />
         <div>
           <button
             className="primary"
