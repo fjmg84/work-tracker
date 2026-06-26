@@ -23,6 +23,7 @@ interface Summary {
 export default function Reports({ projects }: ReportsProps) {
   const [year, setYear] = useState<number>(new Date().getFullYear());
   const [month, setMonth] = useState<number>(new Date().getMonth() + 1);
+  const [selectedProject, setSelectedProject] = useState<number | null>(null);
   const [sessions, setSessions] = useState<Session[]>([]);
   const [activity, setActivity] = useState<{
     prs: PullRequest[];
@@ -33,7 +34,7 @@ export default function Reports({ projects }: ReportsProps) {
 
   useEffect(() => {
     loadData();
-  }, [year, month, projects]);
+  }, [year, month, projects, selectedProject]);
 
   const loadData = async () => {
     const start = new Date(year, month - 1, 1).getTime();
@@ -43,12 +44,22 @@ export default function Reports({ projects }: ReportsProps) {
       from: start,
       to: end,
     });
-    setSessions(sessionData);
+
+    // Filter sessions by project if selected
+    const filteredSessions = selectedProject
+      ? sessionData.filter((s) => s.project_id === selectedProject)
+      : sessionData;
+    setSessions(filteredSessions);
 
     const allPrs: (PullRequest | GitHubActivityError)[] = [];
     const allCommits: Commit[] = [];
 
-    for (const project of projects) {
+    // Filter projects to load based on selection
+    const projectsToLoad = selectedProject
+      ? projects.filter((p) => p.id === selectedProject)
+      : projects;
+
+    for (const project of projectsToLoad) {
       try {
         const { prs } = await window.api.github.getUserActivity({
           accountId: project.account_id,
@@ -85,7 +96,7 @@ export default function Reports({ projects }: ReportsProps) {
       commits: allCommits,
     });
 
-    const filtered = sessionData.filter((s) => s.end_time);
+    const filtered = filteredSessions.filter((s) => s.end_time);
     const totalMinutes = filtered.reduce(
       (acc, s) => acc + Math.round(((s.end_time ?? 0) - s.start_time) / 60000),
       0,
@@ -127,6 +138,21 @@ export default function Reports({ projects }: ReportsProps) {
           onYearChange={setYear}
           onMonthChange={setMonth}
         />
+        <div>
+          <select
+            value={selectedProject || ""}
+            onChange={(e) =>
+              setSelectedProject(e.target.value ? Number(e.target.value) : null)
+            }
+          >
+            <option value="">Todos los proyectos</option>
+            {projects.map((p) => (
+              <option key={p.id} value={p.id}>
+                {p.name}
+              </option>
+            ))}
+          </select>
+        </div>
         <div>
           <button
             className="primary"
