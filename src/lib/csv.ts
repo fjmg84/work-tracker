@@ -1,4 +1,4 @@
-import { ReportData } from "../types";
+import { ReportData, PullRequest } from "../types";
 
 function escapeCsv(value: unknown): string {
   if (value === null || value === undefined) return "";
@@ -43,7 +43,6 @@ function generateReport({
   sessions,
   projects,
   prs,
-  commits,
 }: ReportData): string {
   const startOfMonth = new Date(year, month - 1, 1).getTime();
   const endOfMonth = new Date(year, month, 0, 23, 59, 59, 999).getTime();
@@ -102,28 +101,68 @@ function generateReport({
     Total_Minutos: totalMinutes,
   });
 
-  const prRows = prs.map((pr) => ({
-    Fecha: formatDate(new Date(pr.created_at).getTime()),
-    Proyecto: pr.projectName || "",
-    Cuenta: pr.accountLabel || "",
-    Usuario_GitHub: pr.account_username,
-    Tipo: "PR",
-    Numero: pr.number,
-    Titulo: pr.title,
-    Estado: pr.state,
-    URL: pr.html_url,
-  }));
+  // Group PRs by account
+  const prsByAccount = new Map<string, PullRequest[]>();
+  prs.forEach((pr) => {
+    const account = pr.accountLabel || "Sin cuenta";
+    if (!prsByAccount.has(account)) {
+      prsByAccount.set(account, []);
+    }
+    prsByAccount.get(account)!.push(pr);
+  });
 
-  const commitRows = commits.map((c) => ({
-    Fecha: formatDate(new Date(c.date).getTime()),
-    Proyecto: c.projectName || "",
-    Cuenta: c.accountLabel || "",
-    Usuario_GitHub: c.account_username,
-    Tipo: "Commit",
-    SHA: c.sha.substring(0, 7),
-    Mensaje: c.message,
-    URL: c.html_url,
-  }));
+  // Sort PRs within each account by project, then by date
+  for (const accountPrs of prsByAccount.values()) {
+    accountPrs.sort((a, b) => {
+      const projectCompare = (a.projectName || "").localeCompare(
+        b.projectName || "",
+      );
+      if (projectCompare !== 0) return projectCompare;
+      return (
+        new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
+      );
+    });
+  }
+
+  // Generate PR rows with commits grouped, avoiding repetition
+  const prRows: Record<string, unknown>[] = [];
+  let lastAccount = "";
+  let lastProject = "";
+  let lastDate = "";
+
+  for (const [account, accountPrs] of prsByAccount.entries()) {
+    for (const pr of accountPrs) {
+      const currentDate = formatDate(new Date(pr.created_at).getTime());
+      const commitsText =
+        pr.commits && pr.commits.length > 0
+          ? pr.commits
+              .map((c) => `• ${c.sha.substring(0, 7)}: ${c.message}`)
+              .join("\n")
+          : "Sin commits";
+
+      prRows.push({
+        Fecha: currentDate === lastDate ? "" : currentDate,
+        Proyecto:
+          (pr.projectName || "") === lastProject ? "" : pr.projectName || "",
+        Cuenta: account === lastAccount ? "" : account,
+        Usuario_GitHub: pr.account_username,
+        Tipo: "PR",
+        Numero: pr.number,
+        Titulo: pr.title,
+        Estado: pr.state,
+        Commits: commitsText,
+        URL: pr.html_url,
+      });
+
+      lastAccount = account;
+      lastProject = pr.projectName || "";
+      lastDate = currentDate;
+    }
+    // Reset last values when changing account
+    lastAccount = "";
+    lastProject = "";
+    lastDate = "";
+  }
 
   const sections: string[] = [];
   sections.push(`Resumen ${month}/${year}`);
@@ -132,11 +171,8 @@ function generateReport({
   sections.push("Sesiones de trabajo");
   sections.push(rowsToCsv(sessionRows));
   sections.push("");
-  sections.push("Pull Requests");
+  sections.push("Pull Requests y Commits (agrupados por cuenta)");
   sections.push(rowsToCsv(prRows));
-  sections.push("");
-  sections.push("Commits");
-  sections.push(rowsToCsv(commitRows));
 
   return sections.join("\n");
 }

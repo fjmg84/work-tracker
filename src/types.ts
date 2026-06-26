@@ -89,7 +89,7 @@ export interface ReportData {
   sessions: Session[];
   projects: Project[];
   prs: PullRequest[];
-  commits: Commit[];
+  commits?: Commit[];
 }
 
 export interface AccountCreateInput {

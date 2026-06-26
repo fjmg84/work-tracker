@@ -105,7 +105,6 @@ export default function Reports({ projects }: ReportsProps) {
       sessions,
       projects,
       prs: activity.prs,
-      commits: activity.commits,
     });
 
     const defaultPath = `reporte-${year}-${String(month).padStart(2, "0")}.csv`;
