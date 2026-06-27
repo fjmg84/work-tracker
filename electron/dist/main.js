@@ -8,7 +8,7 @@ const path_1 = __importDefault(require("path"));
 const better_sqlite3_1 = __importDefault(require("better-sqlite3"));
 const rest_1 = require("@octokit/rest");
 const fs_1 = __importDefault(require("fs"));
-const isDev = process.env.NODE_ENV !== "production";
+const isDev = !electron_1.app.isPackaged;
 const PORT = 5170;
 const dbPath = path_1.default.join(electron_1.app.getPath("userData"), "work-tracker.db");
 const db = new better_sqlite3_1.default(dbPath);

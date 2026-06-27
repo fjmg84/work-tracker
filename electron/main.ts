@@ -4,7 +4,7 @@ import Database from "better-sqlite3";
 import { Octokit } from "@octokit/rest";
 import fs from "fs";
 
-const isDev = process.env.NODE_ENV !== "production";
+const isDev = !app.isPackaged;
 const PORT = 5170;
 const dbPath = path.join(app.getPath("userData"), "work-tracker.db");
 const db = new Database(dbPath);
