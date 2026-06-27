@@ -12,11 +12,7 @@
     "build": "vite build && npm run build:electron",
     "build:electron": "tsc -p tsconfig.node.json",
     "pack:base": "vite build && npm run build:electron",
-    "build:app": "npm run pack:base && electron-builder --mac",
     "build:mac": "npm run pack:base && electron-builder --mac",
-    "build:win": "npm run pack:base && electron-builder --win",
-    "build:linux": "npm run pack:base && electron-builder --linux",
-    "build:all": "npm run pack:base && electron-builder -mwl",
     "preview": "vite preview"
   },
   "build": {
@@ -33,16 +29,6 @@
     "mac": {
       "target": "dmg",
       "category": "public.app-category.productivity"
-    },
-    "win": {
-      "target": "nsis"
-    },
-    "linux": {
-      "target": [
-        "AppImage",
-        "deb"
-      ],
-      "category": "Utility"
     }
   },
   "dependencies": {
