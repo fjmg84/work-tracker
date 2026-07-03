@@ -85,12 +85,17 @@ export default function Timer({ projects, onSessionChange }: TimerProps) {
 
   return (
     <div className="card">
-      <h3>Cronómetro</h3>
+      <h3 className="text-base font-medium text-[var(--color-text-light)] dark:text-[var(--color-text-dark)] mb-3">
+        Cronómetro
+      </h3>
 
-      <div className="form-row">
-        <div>
-          <label className="small">Proyecto</label>
+      <div className="flex gap-3 mb-3 items-end">
+        <div className="flex-1">
+          <label className="block text-sm text-[var(--color-text-muted-light)] dark:text-[var(--color-text-muted-dark)] mb-1">
+            Proyecto
+          </label>
           <select
+            className="input"
             value={selectedProjectId}
             onChange={(e) => setSelectedProjectId(e.target.value)}
             disabled={!!activeSession}
@@ -105,11 +110,14 @@ export default function Timer({ projects, onSessionChange }: TimerProps) {
         </div>
       </div>
 
-      <div className="form-row">
-        <div>
-          <label className="small">Notas (opcional)</label>
+      <div className="flex gap-3 mb-3 items-end">
+        <div className="flex-1">
+          <label className="block text-sm text-[var(--color-text-muted-light)] dark:text-[var(--color-text-muted-dark)] mb-1">
+            Notas (opcional)
+          </label>
           <input
             type="text"
+            className="input"
             value={notes}
             onChange={(e) => setNotes(e.target.value)}
             placeholder="Qué estás haciendo..."
@@ -118,30 +126,36 @@ export default function Timer({ projects, onSessionChange }: TimerProps) {
         </div>
       </div>
 
-      <div className="timer-display">{formatElapsed(elapsed)}</div>
+      <div className="text-5xl font-bold font-variant-numeric tabular-nums text-center my-4 text-[var(--color-text-light)] dark:text-[var(--color-text-dark)]">
+        {formatElapsed(elapsed)}
+      </div>
 
-      <div className="timer-controls">
+      <div className="flex gap-3 justify-center">
         <button
-          className="primary"
+          className="btn btn-primary min-w-[100px] text-base py-3 px-5"
           onClick={start}
           disabled={!selectedProjectId || !!activeSession}
         >
           Start
         </button>
-        <button className="danger" onClick={stop} disabled={!activeSession}>
+        <button
+          className="btn btn-danger min-w-[100px] text-base py-3 px-5"
+          onClick={stop}
+          disabled={!activeSession}
+        >
           Stop
         </button>
       </div>
 
       {activeSession && (
-        <p className="small mt-2" style={{ textAlign: "center" }}>
+        <p className="text-sm text-[var(--color-text-muted-light)] dark:text-[var(--color-text-muted-dark)] mt-3 text-center">
           Sesión activa desde{" "}
           {new Date(activeSession.start_time).toLocaleString("es-ES")}
         </p>
       )}
 
       {!projects.length && (
-        <p className="empty-state mt-2">
+        <p className="text-[var(--color-text-muted-light)] dark:text-[var(--color-text-muted-dark)] text-center py-5 italic mt-3">
           Crea al menos un proyecto y una cuenta de GitHub para empezar.
         </p>
       )}

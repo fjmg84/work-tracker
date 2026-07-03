@@ -129,17 +129,20 @@ export default function Reports({ projects }: ReportsProps) {
 
   return (
     <div className="card">
-      <h3>Reporte mensual</h3>
+      <h3 className="text-base font-medium text-[var(--color-text-light)] dark:text-[var(--color-text-dark)] mb-3">
+        Reporte mensual
+      </h3>
 
-      <div className="form-row">
+      <div className="flex gap-3 mb-3 items-end">
         <MonthYearSelector
           year={year}
           month={month}
           onYearChange={setYear}
           onMonthChange={setMonth}
         />
-        <div>
+        <div className="flex-1">
           <select
+            className="input"
             value={selectedProject || ""}
             onChange={(e) =>
               setSelectedProject(e.target.value ? Number(e.target.value) : null)
@@ -153,9 +156,9 @@ export default function Reports({ projects }: ReportsProps) {
             ))}
           </select>
         </div>
-        <div>
+        <div className="flex-1">
           <button
-            className="primary"
+            className="btn btn-primary w-full"
             onClick={exportCsv}
             disabled={projects.length === 0}
           >
@@ -165,40 +168,56 @@ export default function Reports({ projects }: ReportsProps) {
       </div>
 
       {exported && (
-        <p className="small" style={{ color: "#166534" }}>
+        <p className="text-sm text-[var(--color-success)]">
           CSV exportado correctamente.
         </p>
       )}
 
       {summary && (
-        <div className="report-summary mt-2">
-          <div className="summary-box">
-            <div className="value">
+        <div className="grid grid-cols-[repeat(auto-fit,minmax(180px,1fr))] gap-3 mb-4">
+          <div className="bg-[var(--color-surface-muted-light)] dark:bg-[var(--color-surface-muted-dark)] border border-[var(--color-border-light)] dark:border-[var(--color-border-dark)] rounded-md p-3 text-center">
+            <div className="text-2xl font-bold text-[var(--color-primary)]">
               {Math.floor(summary.totalMinutes / 60)}h{" "}
               {summary.totalMinutes % 60}m
             </div>
-            <div className="label">Horas trabajadas en el mes</div>
+            <div className="text-xs text-[var(--color-text-muted-light)] dark:text-[var(--color-text-muted-dark)] uppercase">
+              Horas trabajadas en el mes
+            </div>
           </div>
-          <div className="summary-box">
-            <div className="value">{summary.sessions}</div>
-            <div className="label">Sesiones</div>
+          <div className="bg-[var(--color-surface-muted-light)] dark:bg-[var(--color-surface-muted-dark)] border border-[var(--color-border-light)] dark:border-[var(--color-border-dark)] rounded-md p-3 text-center">
+            <div className="text-2xl font-bold text-[var(--color-primary)]">
+              {summary.sessions}
+            </div>
+            <div className="text-xs text-[var(--color-text-muted-light)] dark:text-[var(--color-text-muted-dark)] uppercase">
+              Sesiones
+            </div>
           </div>
-          <div className="summary-box">
-            <div className="value">{summary.prs}</div>
-            <div className="label">PRs</div>
+          <div className="bg-[var(--color-surface-muted-light)] dark:bg-[var(--color-surface-muted-dark)] border border-[var(--color-border-light)] dark:border-[var(--color-border-dark)] rounded-md p-3 text-center">
+            <div className="text-2xl font-bold text-[var(--color-primary)]">
+              {summary.prs}
+            </div>
+            <div className="text-xs text-[var(--color-text-muted-light)] dark:text-[var(--color-text-muted-dark)] uppercase">
+              PRs
+            </div>
           </div>
-          <div className="summary-box">
-            <div className="value">{summary.commits}</div>
-            <div className="label">Commits</div>
+          <div className="bg-[var(--color-surface-muted-light)] dark:bg-[var(--color-surface-muted-dark)] border border-[var(--color-border-light)] dark:border-[var(--color-border-dark)] rounded-md p-3 text-center">
+            <div className="text-2xl font-bold text-[var(--color-primary)]">
+              {summary.commits}
+            </div>
+            <div className="text-xs text-[var(--color-text-muted-light)] dark:text-[var(--color-text-muted-dark)] uppercase">
+              Commits
+            </div>
           </div>
         </div>
       )}
 
-      <div className="mt-2">
-        <h4>Sesiones del mes</h4>
-        <ul className="session-list">
+      <div className="mt-3">
+        <h4 className="text-sm font-medium text-[var(--color-text-light)] dark:text-[var(--color-text-dark)] mb-2">
+          Sesiones del mes
+        </h4>
+        <ul className="list-none mt-3">
           {sessions.filter((s) => s.end_time).length === 0 && (
-            <li className="empty-state">
+            <li className="text-[var(--color-text-muted-light)] dark:text-[var(--color-text-muted-dark)] text-center py-5 italic">
               No hay sesiones registradas en este mes.
             </li>
           )}
@@ -206,7 +225,8 @@ export default function Reports({ projects }: ReportsProps) {
             sessions
               .filter((s) => s.end_time)
               .reduce<Record<string, Session[]>>((groups, s) => {
-                const dayKey = "Día " + new Date(s.start_time).getDate().toString();
+                const dayKey =
+                  "Día " + new Date(s.start_time).getDate().toString();
                 (groups[dayKey] ??= []).push(s);
                 return groups;
               }, {}),
@@ -217,9 +237,11 @@ export default function Reports({ projects }: ReportsProps) {
               0,
             );
             return (
-              <li key={dayKey} className="session-day-group">
-                <div className="session-day-header">{dayKey}</div>
-                <ul className="session-list">
+              <li key={dayKey} className="mb-4">
+                <div className="text-sm font-medium text-[var(--color-text-light)] dark:text-[var(--color-text-dark)] mb-2">
+                  {dayKey}
+                </div>
+                <ul className="list-none">
                   {daySessions.map((s) => {
                     const project = projects.find(
                       (p) => p.id === s.project_id,
@@ -231,15 +253,20 @@ export default function Reports({ projects }: ReportsProps) {
                       ((s.end_time ?? 0) - s.start_time) / 60000,
                     );
                     return (
-                      <li key={s.id} className="session-item">
-                        <span>{project.name}</span>
-                        <span>
+                      <li
+                        key={s.id}
+                        className="flex justify-between py-2 border-b border-[var(--color-border-light)] dark:border-[var(--color-border-dark)] last:border-b-0"
+                      >
+                        <span className="text-[var(--color-text-light)] dark:text-[var(--color-text-dark)]">
+                          {project.name}
+                        </span>
+                        <span className="text-[var(--color-text-light)] dark:text-[var(--color-text-dark)]">
                           {Math.floor(minutes / 60)}h {minutes % 60}m
                         </span>
                       </li>
                     );
                   })}
-                  <li className="session-item session-day-total">
+                  <li className="flex justify-between py-2 border-b border-[var(--color-border-light)] dark:border-[var(--color-border-dark)] last:border-b-0 font-medium text-[var(--color-primary)]">
                     <span>Total del día</span>
                     <span>
                       {Math.floor(dayMinutes / 60)}h {dayMinutes % 60}m

@@ -94,18 +94,20 @@ export default function Activity({ projects }: ActivityProps) {
 
   return (
     <div className="card">
-      <h3>Actividad de GitHub</h3>
+      <h3 className="text-base font-medium text-[var(--color-text-light)] dark:text-[var(--color-text-dark)] mb-3">
+        Actividad de GitHub
+      </h3>
 
-      <div className="form-row">
+      <div className="flex gap-3 mb-3 items-end">
         <MonthYearSelector
           year={year}
           month={month}
           onYearChange={setYear}
           onMonthChange={setMonth}
         />
-        <div>
+        <div className="flex-1">
           <button
-            className="primary"
+            className="btn btn-primary w-full"
             onClick={load}
             disabled={loading || projects.length === 0}
           >
@@ -114,16 +116,12 @@ export default function Activity({ projects }: ActivityProps) {
         </div>
       </div>
 
-      {error && (
-        <p className="small" style={{ color: "#dc2626" }}>
-          {error}
-        </p>
-      )}
+      {error && <p className="text-sm text-[var(--color-danger)]">{error}</p>}
 
       {errors.length > 0 && (
-        <div className="mt-2">
+        <div className="mt-3">
           {errors.map((e, i) => (
-            <p key={i} className="small" style={{ color: "#dc2626" }}>
+            <p key={i} className="text-sm text-[var(--color-danger)]">
               Error en {e.projectName}: {e.message}
             </p>
           ))}
@@ -133,13 +131,15 @@ export default function Activity({ projects }: ActivityProps) {
       {result && (
         <>
           {groupedByRepo.size === 0 ? (
-            <p className="empty-state">No se encontraron PRs.</p>
+            <p className="text-[var(--color-text-muted-light)] dark:text-[var(--color-text-muted-dark)] text-center py-5 italic">
+              No se encontraron PRs.
+            </p>
           ) : (
             Array.from(groupedByRepo.entries()).map(([repo, prs]) => (
-              <div key={repo} className="mt-2">
+              <div key={repo} className="mt-3">
                 <h4
+                  className="text-sm font-medium cursor-pointer select-none text-[var(--color-text-light)] dark:text-[var(--color-text-dark)] hover:text-[var(--color-primary)]"
                   onClick={() => toggleRepo(repo)}
-                  style={{ cursor: "pointer", userSelect: "none" }}
                 >
                   {openRepos.has(repo) ? "▼" : "▶"} {repo}
                 </h4>
@@ -147,19 +147,22 @@ export default function Activity({ projects }: ActivityProps) {
                 {openRepos.has(repo) && (
                   <>
                     {prs.length === 0 ? (
-                      <p className="empty-state">No se encontraron PRs.</p>
+                      <p className="text-[var(--color-text-muted-light)] dark:text-[var(--color-text-muted-dark)] text-center py-5 italic">
+                        No se encontraron PRs.
+                      </p>
                     ) : (
                       prs.map((pr) => (
-                        <div key={pr.id} className="mt-2">
-                          <div className="gh-item">
+                        <div key={pr.id} className="mt-3">
+                          <div className="py-2 border-b border-[var(--color-border-light)] dark:border-[var(--color-border-dark)] last:border-b-0">
                             <a
                               href={pr.html_url}
                               target="_blank"
                               rel="noreferrer"
+                              className="text-[var(--color-primary)] font-semibold no-underline hover:underline"
                             >
                               #{pr.number} {pr.title}
                             </a>
-                            <div className="gh-meta">
+                            <div className="text-xs text-[var(--color-text-muted-light)] dark:text-[var(--color-text-muted-dark)] mt-0.5">
                               {new Date(pr.created_at).toLocaleDateString(
                                 "es-ES",
                               )}{" "}
@@ -168,22 +171,25 @@ export default function Activity({ projects }: ActivityProps) {
                           </div>
 
                           {pr.commits && pr.commits.length > 0 && (
-                            <div
-                              className="mt-2"
-                              style={{ marginLeft: "20px" }}
-                            >
-                              <h6>Commits ({pr.commits.length})</h6>
+                            <div className="mt-2 ml-5">
+                              <h6 className="text-sm font-medium text-[var(--color-text-light)] dark:text-[var(--color-text-dark)]">
+                                Commits ({pr.commits.length})
+                              </h6>
                               {pr.commits.map((c) => (
-                                <div key={c.sha} className="gh-item">
+                                <div
+                                  key={c.sha}
+                                  className="py-2 border-b border-[var(--color-border-light)] dark:border-[var(--color-border-dark)] last:border-b-0"
+                                >
                                   <a
                                     href={c.html_url}
                                     target="_blank"
                                     rel="noreferrer"
+                                    className="text-[var(--color-primary)] font-semibold no-underline hover:underline"
                                   >
                                     {c.sha.substring(0, 7)}
                                   </a>{" "}
                                   {c.message}
-                                  <div className="gh-meta">
+                                  <div className="text-xs text-[var(--color-text-muted-light)] dark:text-[var(--color-text-muted-dark)] mt-0.5">
                                     {new Date(c.date).toLocaleDateString(
                                       "es-ES",
                                     )}

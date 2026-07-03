@@ -67,25 +67,37 @@ export default function Projects({
 
   return (
     <div className="card">
-      <h3>Proyectos</h3>
+      <h3 className="text-base font-medium text-[var(--color-text-light)] dark:text-[var(--color-text-dark)] mb-3">
+        Proyectos
+      </h3>
 
-      <ul className="list mb-2">
+      <ul className="list-none mb-3">
         {projects.length === 0 && (
-          <li className="empty-state">No hay proyectos registrados.</li>
+          <li className="text-[var(--color-text-muted-light)] dark:text-[var(--color-text-muted-dark)] text-center py-5 italic">
+            No hay proyectos registrados.
+          </li>
         )}
         {projects.map((p) => (
-          <li key={p.id}>
+          <li
+            key={p.id}
+            className="flex justify-between items-center py-2.5 border-b border-[var(--color-border-light)] dark:border-[var(--color-border-dark)] last:border-b-0"
+          >
             <div>
-              <strong>{p.name}</strong>
-              <div className="small">
+              <strong className="text-[var(--color-text-light)] dark:text-[var(--color-text-dark)]">
+                {p.name}
+              </strong>
+              <div className="text-sm text-[var(--color-text-muted-light)] dark:text-[var(--color-text-muted-dark)]">
                 {p.repo} · {p.account_label} (@{p.account_username})
               </div>
             </div>
-            <div>
-              <button className="secondary" onClick={() => startEdit(p)}>
+            <div className="flex gap-2">
+              <button
+                className="btn btn-secondary"
+                onClick={() => startEdit(p)}
+              >
                 Editar
-              </button>{" "}
-              <button className="danger" onClick={() => remove(p.id)}>
+              </button>
+              <button className="btn btn-danger" onClick={() => remove(p.id)}>
                 Eliminar
               </button>
             </div>
@@ -93,24 +105,30 @@ export default function Projects({
         ))}
       </ul>
 
-      <button className="primary" onClick={startNew}>
+      <button className="btn btn-primary" onClick={startNew}>
         Agregar proyecto
       </button>
 
       {editing && (
-        <form onSubmit={save} className="mt-2">
-          <div className="form-row">
-            <div>
-              <label className="small">Nombre del proyecto</label>
+        <form onSubmit={save} className="mt-3">
+          <div className="flex gap-3 mb-3 items-end">
+            <div className="flex-1">
+              <label className="block text-sm text-[var(--color-text-muted-light)] dark:text-[var(--color-text-muted-dark)] mb-1">
+                Nombre del proyecto
+              </label>
               <input
+                className="input"
                 value={name}
                 onChange={(e) => setName(e.target.value)}
                 required
               />
             </div>
-            <div>
-              <label className="small">Repositorio (organización/repo)</label>
+            <div className="flex-1">
+              <label className="block text-sm text-[var(--color-text-muted-light)] dark:text-[var(--color-text-muted-dark)] mb-1">
+                Repositorio (organización/repo)
+              </label>
               <input
+                className="input"
                 value={repo}
                 onChange={(e) => setRepo(e.target.value)}
                 required
@@ -118,10 +136,13 @@ export default function Projects({
               />
             </div>
           </div>
-          <div className="form-row">
-            <div>
-              <label className="small">Cuenta de GitHub</label>
+          <div className="flex gap-3 mb-3 items-end">
+            <div className="flex-1">
+              <label className="block text-sm text-[var(--color-text-muted-light)] dark:text-[var(--color-text-muted-dark)] mb-1">
+                Cuenta de GitHub
+              </label>
               <select
+                className="input"
                 value={accountId}
                 onChange={(e) => setAccountId(e.target.value)}
                 required
@@ -135,11 +156,11 @@ export default function Projects({
               </select>
             </div>
           </div>
-          <div className="form-row">
-            <button type="submit" className="primary">
+          <div className="flex gap-3">
+            <button type="submit" className="btn btn-primary">
               Guardar
             </button>
-            <button type="button" className="secondary" onClick={reset}>
+            <button type="button" className="btn btn-secondary" onClick={reset}>
               Cancelar
             </button>
           </div>
@@ -147,7 +168,7 @@ export default function Projects({
       )}
 
       {!accounts.length && (
-        <p className="small mt-2">
+        <p className="text-sm text-[var(--color-text-muted-light)] dark:text-[var(--color-text-muted-dark)] mt-3">
           Primero debes agregar al menos una cuenta de GitHub.
         </p>
       )}

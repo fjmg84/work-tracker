@@ -66,23 +66,37 @@ export default function Accounts({ accounts, onChange }: AccountsProps) {
 
   return (
     <div className="card">
-      <h3>Cuentas de GitHub</h3>
+      <h3 className="text-base font-medium text-[var(--color-text-light)] dark:text-[var(--color-text-dark)] mb-3">
+        Cuentas de GitHub
+      </h3>
 
-      <ul className="list mb-2">
+      <ul className="list-none mb-3">
         {accounts.length === 0 && (
-          <li className="empty-state">No hay cuentas registradas.</li>
+          <li className="text-[var(--color-text-muted-light)] dark:text-[var(--color-text-muted-dark)] text-center py-5 italic">
+            No hay cuentas registradas.
+          </li>
         )}
         {accounts.map((a) => (
-          <li key={a.id}>
+          <li
+            key={a.id}
+            className="flex justify-between items-center py-2.5 border-b border-[var(--color-border-light)] dark:border-[var(--color-border-dark)] last:border-b-0"
+          >
             <div>
-              <strong>{a.label}</strong>
-              <div className="small">@{a.username}</div>
+              <strong className="text-[var(--color-text-light)] dark:text-[var(--color-text-dark)]">
+                {a.label}
+              </strong>
+              <div className="text-sm text-[var(--color-text-muted-light)] dark:text-[var(--color-text-muted-dark)]">
+                @{a.username}
+              </div>
             </div>
-            <div>
-              <button className="secondary" onClick={() => startEdit(a)}>
+            <div className="flex gap-2">
+              <button
+                className="btn btn-secondary"
+                onClick={() => startEdit(a)}
+              >
                 Editar
-              </button>{" "}
-              <button className="danger" onClick={() => remove(a.id)}>
+              </button>
+              <button className="btn btn-danger" onClick={() => remove(a.id)}>
                 Eliminar
               </button>
             </div>
@@ -90,38 +104,45 @@ export default function Accounts({ accounts, onChange }: AccountsProps) {
         ))}
       </ul>
 
-      <button className="primary" onClick={startNew}>
+      <button className="btn btn-primary" onClick={startNew}>
         Agregar cuenta
       </button>
 
       {editing && (
-        <form onSubmit={save} className="mt-2">
-          <div className="form-row">
-            <div>
-              <label className="small">Etiqueta (ej. Trabajo, Personal)</label>
+        <form onSubmit={save} className="mt-3">
+          <div className="flex gap-3 mb-3 items-end">
+            <div className="flex-1">
+              <label className="block text-sm text-[var(--color-text-muted-light)] dark:text-[var(--color-text-muted-dark)] mb-1">
+                Etiqueta (ej. Trabajo, Personal)
+              </label>
               <input
+                className="input"
                 value={label}
                 onChange={(e) => setLabel(e.target.value)}
                 required
               />
             </div>
-            <div>
-              <label className="small">Usuario de GitHub</label>
+            <div className="flex-1">
+              <label className="block text-sm text-[var(--color-text-muted-light)] dark:text-[var(--color-text-muted-dark)] mb-1">
+                Usuario de GitHub
+              </label>
               <input
+                className="input"
                 value={username}
                 onChange={(e) => setUsername(e.target.value)}
                 required
               />
             </div>
           </div>
-          <div className="form-row">
-            <div>
-              <label className="small">
+          <div className="flex gap-3 mb-3 items-end">
+            <div className="flex-1">
+              <label className="block text-sm text-[var(--color-text-muted-light)] dark:text-[var(--color-text-muted-dark)] mb-1">
                 Token de acceso personal{" "}
                 {editing.id && "(dejar en blanco para mantener el actual)"}
               </label>
               <input
                 type="password"
+                className="input"
                 value={token}
                 onChange={(e) => setToken(e.target.value)}
                 required={!editing.id}
@@ -129,22 +150,29 @@ export default function Accounts({ accounts, onChange }: AccountsProps) {
               />
             </div>
           </div>
-          <div className="form-row">
-            <button type="submit" className="primary">
+          <div className="flex gap-3">
+            <button type="submit" className="btn btn-primary">
               Guardar
             </button>
-            <button type="button" className="secondary" onClick={reset}>
+            <button type="button" className="btn btn-secondary" onClick={reset}>
               Cancelar
             </button>
           </div>
         </form>
       )}
 
-      <p className="small mt-2">
+      <p className="text-sm text-[var(--color-text-muted-light)] dark:text-[var(--color-text-muted-dark)] mt-3">
         Crea un token en GitHub → Settings → Developer settings → Personal
         access tokens → Tokens (classic). Necesita permisos de lectura de
-        repositorios (<code>repo</code> o <code>public_repo</code> según
-        corresponda).
+        repositorios (
+        <code className="bg-[var(--color-surface-muted-light)] dark:bg-[var(--color-surface-muted-dark)] px-1 rounded">
+          repo
+        </code>{" "}
+        o{" "}
+        <code className="bg-[var(--color-surface-muted-light)] dark:bg-[var(--color-surface-muted-dark)] px-1 rounded">
+          public_repo
+        </code>{" "}
+        según corresponda).
       </p>
     </div>
   );
