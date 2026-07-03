@@ -177,7 +177,7 @@ export default function Reports({ projects }: ReportsProps) {
               {Math.floor(summary.totalMinutes / 60)}h{" "}
               {summary.totalMinutes % 60}m
             </div>
-            <div className="label">Horas trabajadas</div>
+            <div className="label">Horas trabajadas en el mes</div>
           </div>
           <div className="summary-box">
             <div className="value">{summary.sessions}</div>
@@ -202,28 +202,53 @@ export default function Reports({ projects }: ReportsProps) {
               No hay sesiones registradas en este mes.
             </li>
           )}
-          {sessions
-            .filter((s) => s.end_time)
-            .map((s) => {
-              const project = projects.find((p) => p.id === s.project_id) || {
-                name: "-",
-                account_label: "-",
-              };
-              const minutes = Math.round(
-                ((s.end_time ?? 0) - s.start_time) / 60000,
-              );
-              return (
-                <li key={s.id} className="session-item">
-                  <span>
-                    {new Date(s.start_time).toLocaleDateString("es-ES")} ·{" "}
-                    {project.name}
-                  </span>
-                  <span>
-                    {Math.floor(minutes / 60)}h {minutes % 60}m
-                  </span>
-                </li>
-              );
-            })}
+          {Object.entries(
+            sessions
+              .filter((s) => s.end_time)
+              .reduce<Record<string, Session[]>>((groups, s) => {
+                const dayKey = "Día " + new Date(s.start_time).getDate().toString();
+                (groups[dayKey] ??= []).push(s);
+                return groups;
+              }, {}),
+          ).map(([dayKey, daySessions]) => {
+            const dayMinutes = daySessions.reduce(
+              (acc, s) =>
+                acc + Math.round(((s.end_time ?? 0) - s.start_time) / 60000),
+              0,
+            );
+            return (
+              <li key={dayKey} className="session-day-group">
+                <div className="session-day-header">{dayKey}</div>
+                <ul className="session-list">
+                  {daySessions.map((s) => {
+                    const project = projects.find(
+                      (p) => p.id === s.project_id,
+                    ) || {
+                      name: "-",
+                      account_label: "-",
+                    };
+                    const minutes = Math.round(
+                      ((s.end_time ?? 0) - s.start_time) / 60000,
+                    );
+                    return (
+                      <li key={s.id} className="session-item">
+                        <span>{project.name}</span>
+                        <span>
+                          {Math.floor(minutes / 60)}h {minutes % 60}m
+                        </span>
+                      </li>
+                    );
+                  })}
+                  <li className="session-item session-day-total">
+                    <span>Total del día</span>
+                    <span>
+                      {Math.floor(dayMinutes / 60)}h {dayMinutes % 60}m
+                    </span>
+                  </li>
+                </ul>
+              </li>
+            );
+          })}
         </ul>
       </div>
     </div>
