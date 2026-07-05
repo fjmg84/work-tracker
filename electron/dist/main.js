@@ -5,37 +5,17 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 Object.defineProperty(exports, "__esModule", { value: true });
 const electron_1 = require("electron");
 const path_1 = __importDefault(require("path"));
-const better_sqlite3_1 = __importDefault(require("better-sqlite3"));
 const rest_1 = require("@octokit/rest");
 const fs_1 = __importDefault(require("fs"));
+const connection_1 = __importDefault(require("./db/connection"));
+const migrations_1 = require("./db/migrations");
+const queries_1 = require("./db/queries");
 const isDev = !electron_1.app.isPackaged;
 const PORT = 5170;
-const dbPath = path_1.default.join(electron_1.app.getPath("userData"), "work-tracker.db");
-const db = new better_sqlite3_1.default(dbPath);
-db.exec(`
-  CREATE TABLE IF NOT EXISTS accounts (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    label TEXT NOT NULL,
-    username TEXT NOT NULL UNIQUE
-  );
-
-  CREATE TABLE IF NOT EXISTS projects (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    name TEXT NOT NULL,
-    repo TEXT NOT NULL,
-    account_id INTEGER NOT NULL REFERENCES accounts(id) ON DELETE CASCADE
-  );
-
-  CREATE TABLE IF NOT EXISTS sessions (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    project_id INTEGER NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
-    start_time INTEGER NOT NULL,
-    end_time INTEGER,
-    notes TEXT,
-    paused_at INTEGER DEFAULT NULL,
-    total_paused_ms INTEGER DEFAULT 0
-  );
-`);
+(0, migrations_1.initializeSchema)(connection_1.default);
+// ============================================================
+// Token encryption helpers
+// ============================================================
 function safeStoreToken(accountId, token) {
     if (!electron_1.safeStorage.isEncryptionAvailable()) {
         throw new Error("El almacenamiento seguro no está disponible en este sistema.");
@@ -56,6 +36,9 @@ function safeDeleteToken(accountId) {
     if (fs_1.default.existsSync(tokenPath))
         fs_1.default.unlinkSync(tokenPath);
 }
+// ============================================================
+// Window
+// ============================================================
 let mainWindow = null;
 function createWindow() {
     mainWindow = new electron_1.BrowserWindow({
@@ -78,6 +61,9 @@ function createWindow() {
         mainWindow = null;
     });
 }
+// ============================================================
+// App lifecycle
+// ============================================================
 electron_1.app.whenReady().then(() => {
     createWindow();
     // Power monitor: track suspend/resume
@@ -88,9 +74,8 @@ electron_1.app.whenReady().then(() => {
     electron_1.powerMonitor.on("resume", () => {
         if (suspendTimestamp) {
             const suspendDuration = Date.now() - suspendTimestamp;
-            db.prepare("UPDATE sessions SET start_time = start_time + ?, total_paused_ms = total_paused_ms + ? WHERE end_time IS NULL").run(suspendDuration, suspendDuration);
+            queries_1.sessionQueries.adjustForSuspend(connection_1.default, { suspendDuration });
             suspendTimestamp = null;
-            // Notify renderer
             mainWindow?.webContents.send("session:resumed-from-suspend");
         }
     });
@@ -98,18 +83,22 @@ electron_1.app.whenReady().then(() => {
     setInterval(() => {
         const idleSeconds = electron_1.powerMonitor.getSystemIdleTime();
         if (idleSeconds >= 600) {
-            const session = db
-                .prepare("SELECT * FROM sessions WHERE end_time IS NULL AND paused_at IS NULL")
-                .get();
+            const session = queries_1.sessionQueries.getActiveUnpaused(connection_1.default);
             if (session) {
-                db.prepare("UPDATE sessions SET paused_at = ? WHERE id = ?").run(Date.now(), session.id);
+                queries_1.sessionQueries.markIdlePaused(connection_1.default, { id: session.id, paused_at: Date.now() });
                 mainWindow?.webContents.send("session:auto-paused");
             }
         }
     }, 60000);
+    // Detect stale sessions (>24h)
+    const threshold = Date.now() - 24 * 60 * 60 * 1000;
+    const staleSessions = queries_1.sessionQueries.getStaleSessions(connection_1.default, { threshold });
+    if (staleSessions.length > 0) {
+        mainWindow?.webContents.send("sessions:stale-detected", staleSessions);
+    }
 });
 function closeActiveSessions() {
-    db.prepare("UPDATE sessions SET end_time = ? WHERE end_time IS NULL").run(Date.now());
+    queries_1.sessionQueries.closeAllActive(connection_1.default, { end_time: Date.now() });
 }
 electron_1.app.on("before-quit", () => {
     closeActiveSessions();
@@ -123,114 +112,91 @@ electron_1.app.on("activate", () => {
     if (electron_1.BrowserWindow.getAllWindows().length === 0)
         createWindow();
 });
+// ============================================================
+// IPC: Accounts
+// ============================================================
 electron_1.ipcMain.handle("db:listAccounts", () => {
-    return db
-        .prepare("SELECT id, label, username FROM accounts ORDER BY label")
-        .all();
+    return queries_1.accountQueries.listAll(connection_1.default);
 });
 electron_1.ipcMain.handle("db:createAccount", (_, { label, username, token }) => {
-    const stmt = db.prepare("INSERT INTO accounts (label, username) VALUES (?, ?)");
-    const info = stmt.run(label, username);
+    const info = queries_1.accountQueries.create(connection_1.default, { label, username });
     const id = Number(info.lastInsertRowid);
     safeStoreToken(id, token);
     return { id, label, username };
 });
 electron_1.ipcMain.handle("db:updateAccount", (_, { id, label, username, token }) => {
-    db.prepare("UPDATE accounts SET label = ?, username = ? WHERE id = ?").run(label, username, id);
+    queries_1.accountQueries.update(connection_1.default, { id, label, username });
     if (token)
         safeStoreToken(id, token);
     return { id, label, username };
 });
 electron_1.ipcMain.handle("db:deleteAccount", (_, id) => {
-    db.prepare("DELETE FROM accounts WHERE id = ?").run(id);
+    queries_1.accountQueries.delete(connection_1.default, id);
     safeDeleteToken(id);
     return true;
 });
+// ============================================================
+// IPC: Projects
+// ============================================================
 electron_1.ipcMain.handle("db:listProjects", () => {
-    return db
-        .prepare(`
-    SELECT p.id, p.name, p.repo, p.account_id, a.label AS account_label, a.username AS account_username
-    FROM projects p
-    JOIN accounts a ON p.account_id = a.id
-    ORDER BY p.name
-  `)
-        .all();
+    return queries_1.projectQueries.listAll(connection_1.default);
 });
 electron_1.ipcMain.handle("db:createProject", (_, { name, repo, account_id }) => {
-    const stmt = db.prepare("INSERT INTO projects (name, repo, account_id) VALUES (?, ?, ?)");
-    const info = stmt.run(name, repo, account_id);
+    const info = queries_1.projectQueries.create(connection_1.default, { name, repo, account_id });
     return { id: info.lastInsertRowid, name, repo, account_id };
 });
 electron_1.ipcMain.handle("db:updateProject", (_, { id, name, repo, account_id }) => {
-    db.prepare("UPDATE projects SET name = ?, repo = ?, account_id = ? WHERE id = ?").run(name, repo, account_id, id);
+    queries_1.projectQueries.update(connection_1.default, { id, name, repo, account_id });
     return { id, name, repo, account_id };
 });
 electron_1.ipcMain.handle("db:deleteProject", (_, id) => {
-    db.prepare("DELETE FROM projects WHERE id = ?").run(id);
+    queries_1.projectQueries.delete(connection_1.default, id);
     return true;
 });
+// ============================================================
+// IPC: Sessions
+// ============================================================
 electron_1.ipcMain.handle("db:listSessions", (_, { projectId, from, to }) => {
-    let query = "SELECT * FROM sessions WHERE 1=1";
-    const params = [];
-    if (projectId) {
-        query += " AND project_id = ?";
-        params.push(projectId);
-    }
-    if (from) {
-        query += " AND start_time >= ?";
-        params.push(from);
-    }
-    if (to) {
-        query += " AND (end_time IS NULL OR end_time <= ?)";
-        params.push(to);
-    }
-    query += " ORDER BY start_time DESC";
-    return db.prepare(query).all(...params);
+    return queries_1.sessionQueries.listFiltered(connection_1.default, { projectId, from, to });
 });
 electron_1.ipcMain.handle("db:createSession", (_, { project_id, start_time, notes }) => {
-    const stmt = db.prepare("INSERT INTO sessions (project_id, start_time, notes) VALUES (?, ?, ?)");
-    const info = stmt.run(project_id, start_time, notes || "");
+    const info = queries_1.sessionQueries.create(connection_1.default, { project_id, start_time, notes });
     return { id: info.lastInsertRowid, project_id, start_time, notes };
 });
 electron_1.ipcMain.handle("db:stopSession", (_, { id, end_time }) => {
-    db.prepare("UPDATE sessions SET end_time = ? WHERE id = ?").run(end_time, id);
-    return db.prepare("SELECT * FROM sessions WHERE id = ?").get(id);
+    return queries_1.sessionQueries.stop(connection_1.default, { id, end_time });
 });
 electron_1.ipcMain.handle("db:deleteSession", (_, id) => {
-    db.prepare("DELETE FROM sessions WHERE id = ?").run(id);
-    return true;
-});
-electron_1.ipcMain.handle("db:closeStaleSessions", (_, { ids }) => {
-    const placeholders = ids.map(() => "?").join(",");
-    db.prepare(`UPDATE sessions SET end_time = ? WHERE id IN (${placeholders})`).run(Date.now(), ...ids);
+    queries_1.sessionQueries.delete(connection_1.default, id);
     return true;
 });
 electron_1.ipcMain.handle("db:getActiveSession", () => {
-    return (db.prepare("SELECT * FROM sessions WHERE end_time IS NULL LIMIT 1").get() ||
-        null);
+    return queries_1.sessionQueries.getActive(connection_1.default);
 });
 electron_1.ipcMain.handle("db:pauseSession", (_, { id }) => {
-    db.prepare("UPDATE sessions SET paused_at = ? WHERE id = ?").run(Date.now(), id);
-    return db.prepare("SELECT * FROM sessions WHERE id = ?").get(id);
+    return queries_1.sessionQueries.pause(connection_1.default, { id, paused_at: Date.now() });
 });
 electron_1.ipcMain.handle("db:resumeSession", (_, { id }) => {
-    const session = db
-        .prepare("SELECT * FROM sessions WHERE id = ?")
-        .get(id);
-    if (session && session.paused_at) {
+    const session = queries_1.sessionQueries.getById(connection_1.default, id);
+    if (session?.paused_at) {
         const pausedDuration = Date.now() - session.paused_at;
-        db.prepare("UPDATE sessions SET paused_at = NULL, start_time = start_time + ?, total_paused_ms = total_paused_ms + ? WHERE id = ?").run(pausedDuration, pausedDuration, id);
+        return queries_1.sessionQueries.resume(connection_1.default, { id, pausedDuration });
     }
-    return db.prepare("SELECT * FROM sessions WHERE id = ?").get(id);
+    return session;
 });
+electron_1.ipcMain.handle("db:closeStaleSessions", (_, { ids }) => {
+    queries_1.sessionQueries.closeStale(connection_1.default, { ids, end_time: Date.now() });
+    return true;
+});
+// ============================================================
+// IPC: GitHub
+// ============================================================
 electron_1.ipcMain.handle("github:getUserActivity", async (_, { accountId, repo, since, until }) => {
     const token = safeGetToken(accountId);
     if (!token)
         throw new Error("No se encontró token para esta cuenta.");
     const octokit = new rest_1.Octokit({ auth: token });
-    const account = db
-        .prepare("SELECT username FROM accounts WHERE id = ?")
-        .get(accountId);
+    const account = queries_1.accountQueries.getById(connection_1.default, accountId);
     if (!account)
         throw new Error("Cuenta no encontrada.");
     const [owner, repoName] = repo.split("/");
@@ -257,7 +223,6 @@ electron_1.ipcMain.handle("github:getUserActivity", async (_, { accountId, repo,
         const created = new Date(pr.created_at).getTime();
         return created >= since && created <= until;
     });
-    // Get commits for each PR
     const prsWithCommits = await Promise.all(filteredPrs.map(async (pr) => {
         try {
             const prCommits = await octokit.paginate(octokit.rest.pulls.listCommits, {
@@ -311,6 +276,9 @@ electron_1.ipcMain.handle("github:validateToken", async (_, { token }) => {
         return { valid: false, error: error.message };
     }
 });
+// ============================================================
+// IPC: App
+// ============================================================
 electron_1.ipcMain.handle("app:exportCsv", async (_, { filePath, content }) => {
     fs_1.default.writeFileSync(filePath, content, "utf8");
     return true;
