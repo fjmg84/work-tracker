@@ -185,7 +185,7 @@ ipcMain.handle("db:listSessions", (_, { projectId, from, to }) => {
 
 ipcMain.handle("db:createSession", (_, { project_id, start_time, notes }) => {
   const info = sessionQueries.create(db, { project_id, start_time, notes });
-  return { id: info.lastInsertRowid, project_id, start_time, notes };
+  return sessionQueries.getById(db, Number(info.lastInsertRowid));
 });
 
 ipcMain.handle("db:stopSession", (_, { id, end_time }) => {

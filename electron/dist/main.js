@@ -161,7 +161,7 @@ electron_1.ipcMain.handle("db:listSessions", (_, { projectId, from, to }) => {
 });
 electron_1.ipcMain.handle("db:createSession", (_, { project_id, start_time, notes }) => {
     const info = queries_1.sessionQueries.create(connection_1.default, { project_id, start_time, notes });
-    return { id: info.lastInsertRowid, project_id, start_time, notes };
+    return queries_1.sessionQueries.getById(connection_1.default, Number(info.lastInsertRowid));
 });
 electron_1.ipcMain.handle("db:stopSession", (_, { id, end_time }) => {
     return queries_1.sessionQueries.stop(connection_1.default, { id, end_time });

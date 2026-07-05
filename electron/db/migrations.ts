@@ -20,9 +20,20 @@ export function initializeSchema(db: Database.Database): void {
       project_id INTEGER NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
       start_time INTEGER NOT NULL,
       end_time INTEGER,
-      notes TEXT,
-      paused_at INTEGER DEFAULT NULL,
-      total_paused_ms INTEGER DEFAULT 0
+      notes TEXT
     );
   `);
+
+  // Incremental migration: add missing columns to existing databases
+  const sessionColumns = db
+    .prepare("PRAGMA table_info(sessions)")
+    .all()
+    .map((c: any) => c.name);
+
+  if (!sessionColumns.includes("paused_at")) {
+    db.exec("ALTER TABLE sessions ADD COLUMN paused_at INTEGER DEFAULT NULL");
+  }
+  if (!sessionColumns.includes("total_paused_ms")) {
+    db.exec("ALTER TABLE sessions ADD COLUMN total_paused_ms INTEGER DEFAULT 0");
+  }
 }
