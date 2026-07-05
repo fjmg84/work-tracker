@@ -22,8 +22,8 @@ contextBridge.exposeInMainWorld("api", {
   github: {
     getUserActivity: (data: any) =>
       ipcRenderer.invoke("github:getUserActivity", data),
-    validateToken: (token: any, expectedUsername: any) =>
-      ipcRenderer.invoke("github:validateToken", token, expectedUsername),
+    validateToken: (data: any) =>
+      ipcRenderer.invoke("github:validateToken", data),
   },
   app: {
     exportCsv: (data: any) => ipcRenderer.invoke("app:exportCsv", data),
