@@ -4,20 +4,24 @@ import path from "path";
 
 const PORT = 5170;
 
-export default defineConfig({
-  plugins: [react()],
-  root: "src",
-  base: "./",
-  build: {
-    outDir: "../dist",
-    emptyOutDir: true,
-  },
-  resolve: {
-    alias: {
-      "@": path.resolve(__dirname, "./src"),
+export default defineConfig(async () => {
+  // @ts-expect-error - @tailwindcss/vite is ESM-only
+  const tailwindcss = await import("@tailwindcss/vite");
+  return {
+    plugins: [react(), tailwindcss.default()],
+    root: "src",
+    base: "./",
+    build: {
+      outDir: "../dist",
+      emptyOutDir: true,
     },
-  },
-  server: {
-    port: PORT,
-  },
+    resolve: {
+      alias: {
+        "@": path.resolve(__dirname, "./src"),
+      },
+    },
+    server: {
+      port: PORT,
+    },
+  };
 });

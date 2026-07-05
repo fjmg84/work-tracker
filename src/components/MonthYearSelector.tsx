@@ -13,17 +13,23 @@ export default function MonthYearSelector({
 }: MonthYearSelectorProps) {
   return (
     <>
-      <div>
-        <label className="small">Año</label>
+      <div className="flex-1">
+        <label className="block text-sm text-[var(--color-text-muted-light)] dark:text-[var(--color-text-muted-dark)] mb-1">
+          Año
+        </label>
         <input
           type="number"
+          className="input"
           value={year}
           onChange={(e) => onYearChange(Number(e.target.value))}
         />
       </div>
-      <div>
-        <label className="small">Mes</label>
+      <div className="flex-1">
+        <label className="block text-sm text-[var(--color-text-muted-light)] dark:text-[var(--color-text-muted-dark)] mb-1">
+          Mes
+        </label>
         <select
+          className="input"
           value={month}
           onChange={(e) => onMonthChange(Number(e.target.value))}
         >

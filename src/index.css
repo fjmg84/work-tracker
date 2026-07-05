@@ -1,0 +1,72 @@
+@import "tailwindcss";
+
+@custom-variant dark (&:where(.dark, .dark *));
+
+@theme {
+  --color-primary: #2563eb;
+  --color-primary-hover: #1d4ed8;
+  --color-danger: #dc2626;
+  --color-danger-hover: #b91c1c;
+  --color-success: #166534;
+
+  --color-bg-light: #f5f6f7;
+  --color-bg-dark: #0f172a;
+  --color-surface-light: #ffffff;
+  --color-surface-dark: #1e293b;
+  --color-surface-muted-light: #f8fafc;
+  --color-surface-muted-dark: #334155;
+  --color-border-light: #e2e8f0;
+  --color-border-dark: #475569;
+
+  --color-text-light: #1a1a1a;
+  --color-text-dark: #f1f5f9;
+  --color-text-muted-light: #64748b;
+  --color-text-muted-dark: #94a3b8;
+
+  --radius-md: 0.5rem;
+  --radius-lg: 0.75rem;
+
+  --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.05);
+  --shadow-md: 0 1px 3px 0 rgb(0 0 0 / 0.1), 0 1px 2px -1px rgb(0 0 0 / 0.1);
+}
+
+/* Reusable component classes */
+.btn {
+  @apply cursor-pointer border-none rounded-md px-3.5 py-2 text-sm transition-all duration-150 active:translate-y-px;
+}
+
+.btn-primary {
+  @apply bg-[var(--color-primary)] text-white hover:bg-[var(--color-primary-hover)] disabled:opacity-60 disabled:cursor-not-allowed;
+}
+
+.btn-secondary {
+  @apply bg-[var(--color-border-light)] text-[var(--color-text-light)] hover:bg-[var(--color-border-dark)] dark:bg-[var(--color-surface-muted-dark)] dark:text-[var(--color-text-dark)] dark:hover:bg-[var(--color-border-dark)];
+}
+
+.btn-danger {
+  @apply bg-[var(--color-danger)] text-white hover:bg-[var(--color-danger-hover)] disabled:opacity-60 disabled:cursor-not-allowed;
+}
+
+.card {
+  @apply bg-[var(--color-surface-light)] dark:bg-[var(--color-surface-dark)] rounded-lg shadow-md p-4 mb-4;
+}
+
+.input {
+  @apply px-2.5 py-2 border border-[var(--color-border-light)] dark:border-[var(--color-border-dark)] rounded-md text-sm w-full focus:outline-none focus:border-[var(--color-primary)] bg-[var(--color-surface-light)] dark:bg-[var(--color-surface-muted-dark)] text-[var(--color-text-light)] dark:text-[var(--color-text-dark)];
+}
+
+.badge {
+  @apply inline-block px-2 py-0.5 rounded-full text-xs font-semibold;
+}
+
+.badge-blue {
+  @apply bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200;
+}
+
+.badge-green {
+  @apply bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200;
+}
+
+.badge-gray {
+  @apply bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-200;
+}
