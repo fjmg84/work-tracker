@@ -13,7 +13,9 @@
     "build:electron": "tsc -p tsconfig.node.json",
     "pack:base": "vite build && npm run build:electron",
     "build:mac": "npm run pack:base && electron-builder --mac",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "test": "vitest run",
+    "test:watch": "vitest"
   },
   "build": {
     "appId": "com.worktracker.app",
@@ -51,6 +53,7 @@
     "tailwindcss": "^4.3.2",
     "typescript": "^5.5.2",
     "vite": "^5.3.2",
+    "vitest": "^2.1.9",
     "wait-on": "^7.2.0"
   }
 }
