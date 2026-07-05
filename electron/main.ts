@@ -312,6 +312,16 @@ ipcMain.handle(
   },
 );
 
+ipcMain.handle("github:validateToken", async (_, { token }) => {
+  try {
+    const octokit = new Octokit({ auth: token });
+    const { data } = await octokit.users.getAuthenticated();
+    return { valid: true, username: data.login };
+  } catch (error: any) {
+    return { valid: false, error: error.message };
+  }
+});
+
 ipcMain.handle("app:exportCsv", async (_, { filePath, content }) => {
   fs.writeFileSync(filePath, content, "utf8");
   return true;

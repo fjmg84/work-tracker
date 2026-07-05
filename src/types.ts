@@ -132,7 +132,9 @@ export interface DbApi {
 
 export interface GitHubApi {
   getUserActivity: (params: UserActivityParams) => Promise<GitHubActivity>;
-  validateToken: (token: string, expectedUsername: string) => Promise<boolean>;
+  validateToken: (data: {
+    token: string;
+  }) => Promise<{ valid: boolean; username?: string; error?: string }>;
 }
 
 export interface AppApi {

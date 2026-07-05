@@ -36,6 +36,19 @@ export default function Accounts({ accounts, onChange }: AccountsProps) {
     if (!label.trim() || !username.trim()) return;
 
     if (editing && editing.id) {
+      if (token.trim()) {
+        const result = await window.api.github.validateToken({ token });
+        if (!result.valid) {
+          alert(`Token inválido: ${result.error}`);
+          return;
+        }
+        if (result.username && result.username !== username.trim()) {
+          alert(
+            `El token pertenece al usuario "${result.username}", no a "${username.trim()}".`,
+          );
+          return;
+        }
+      }
       await window.api.db.updateAccount({
         id: editing.id,
         label,
@@ -45,6 +58,17 @@ export default function Accounts({ accounts, onChange }: AccountsProps) {
     } else {
       if (!token.trim()) {
         alert("El token es obligatorio para una nueva cuenta.");
+        return;
+      }
+      const result = await window.api.github.validateToken({ token });
+      if (!result.valid) {
+        alert(`Token inválido: ${result.error}`);
+        return;
+      }
+      if (result.username && result.username !== username.trim()) {
+        alert(
+          `El token pertenece al usuario "${result.username}", no a "${username.trim()}".`,
+        );
         return;
       }
       await window.api.db.createAccount({ label, username, token });
