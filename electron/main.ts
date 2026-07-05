@@ -219,7 +219,7 @@ ipcMain.handle("db:deleteProject", (_, id) => {
 
 ipcMain.handle("db:listSessions", (_, { projectId, from, to }) => {
   let query = "SELECT * FROM sessions WHERE 1=1";
-  const params = [];
+  const params: number[] = [];
   if (projectId) {
     query += " AND project_id = ?";
     params.push(projectId);
