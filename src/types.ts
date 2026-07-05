@@ -128,11 +128,15 @@ export interface DbApi {
   stopSession: (data: { id: number; end_time: number }) => Promise<Session>;
   deleteSession: (id: number) => Promise<boolean>;
   getActiveSession: () => Promise<Session | null>;
+  pauseSession: (data: { id: number }) => Promise<Session>;
+  resumeSession: (data: { id: number }) => Promise<Session>;
 }
 
 export interface GitHubApi {
   getUserActivity: (params: UserActivityParams) => Promise<GitHubActivity>;
-  validateToken: (token: string, expectedUsername: string) => Promise<boolean>;
+  validateToken: (data: {
+    token: string;
+  }) => Promise<{ valid: boolean; username?: string; error?: string }>;
 }
 
 export interface AppApi {
@@ -151,4 +155,5 @@ export interface Api {
   db: DbApi;
   github: GitHubApi;
   app: AppApi;
+  on: (channel: string, callback: (...args: any[]) => void) => void;
 }

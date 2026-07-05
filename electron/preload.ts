@@ -18,16 +18,22 @@ contextBridge.exposeInMainWorld("api", {
     stopSession: (data: any) => ipcRenderer.invoke("db:stopSession", data),
     deleteSession: (id: any) => ipcRenderer.invoke("db:deleteSession", id),
     getActiveSession: () => ipcRenderer.invoke("db:getActiveSession"),
+    pauseSession: (data: any) => ipcRenderer.invoke("db:pauseSession", data),
+    resumeSession: (data: any) =>
+      ipcRenderer.invoke("db:resumeSession", data),
   },
   github: {
     getUserActivity: (data: any) =>
       ipcRenderer.invoke("github:getUserActivity", data),
-    validateToken: (token: any, expectedUsername: any) =>
-      ipcRenderer.invoke("github:validateToken", token, expectedUsername),
+    validateToken: (data: any) =>
+      ipcRenderer.invoke("github:validateToken", data),
   },
   app: {
     exportCsv: (data: any) => ipcRenderer.invoke("app:exportCsv", data),
     showSaveDialog: (options: any) =>
       ipcRenderer.invoke("app:showSaveDialog", options),
+  },
+  on: (channel: string, callback: (...args: any[]) => void) => {
+    ipcRenderer.on(channel, (_event, ...args) => callback(...args));
   },
 });

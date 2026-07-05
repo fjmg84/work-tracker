@@ -1,4 +1,4 @@
-import { app, BrowserWindow, ipcMain, safeStorage, dialog } from "electron";
+import { app, BrowserWindow, ipcMain, safeStorage, dialog, powerMonitor } from "electron";
 import path from "path";
 import Database from "better-sqlite3";
 import { Octokit } from "@octokit/rest";
@@ -89,7 +89,47 @@ function createWindow(): void {
   });
 }
 
-app.whenReady().then(createWindow);
+app.whenReady().then(() => {
+  createWindow();
+
+  // Power monitor: track suspend/resume
+  let suspendTimestamp: number | null = null;
+
+  powerMonitor.on("suspend", () => {
+    suspendTimestamp = Date.now();
+  });
+
+  powerMonitor.on("resume", () => {
+    if (suspendTimestamp) {
+      const suspendDuration = Date.now() - suspendTimestamp;
+      db.prepare(
+        "UPDATE sessions SET start_time = start_time + ?, total_paused_ms = total_paused_ms + ? WHERE end_time IS NULL",
+      ).run(suspendDuration, suspendDuration);
+      suspendTimestamp = null;
+      // Notify renderer
+      mainWindow?.webContents.send("session:resumed-from-suspend");
+    }
+  });
+
+  // Idle detection: auto-pause after 10 minutes of inactivity
+  setInterval(() => {
+    const idleSeconds = powerMonitor.getSystemIdleTime();
+    if (idleSeconds >= 600) {
+      const session = db
+        .prepare(
+          "SELECT * FROM sessions WHERE end_time IS NULL AND paused_at IS NULL",
+        )
+        .get() as any;
+      if (session) {
+        db.prepare("UPDATE sessions SET paused_at = ? WHERE id = ?").run(
+          Date.now(),
+          session.id,
+        );
+        mainWindow?.webContents.send("session:auto-paused");
+      }
+    }
+  }, 60000);
+});
 
 app.on("window-all-closed", () => {
   if (process.platform !== "darwin") app.quit();
