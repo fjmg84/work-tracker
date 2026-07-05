@@ -28,7 +28,9 @@ db.exec(`
     project_id INTEGER NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
     start_time INTEGER NOT NULL,
     end_time INTEGER,
-    notes TEXT
+    notes TEXT,
+    paused_at INTEGER DEFAULT NULL,
+    total_paused_ms INTEGER DEFAULT 0
   );
 `);
 
@@ -206,6 +208,27 @@ ipcMain.handle("db:getActiveSession", () => {
     db.prepare("SELECT * FROM sessions WHERE end_time IS NULL LIMIT 1").get() ||
     null
   );
+});
+
+ipcMain.handle("db:pauseSession", (_, { id }) => {
+  db.prepare("UPDATE sessions SET paused_at = ? WHERE id = ?").run(
+    Date.now(),
+    id,
+  );
+  return db.prepare("SELECT * FROM sessions WHERE id = ?").get(id);
+});
+
+ipcMain.handle("db:resumeSession", (_, { id }) => {
+  const session = db
+    .prepare("SELECT * FROM sessions WHERE id = ?")
+    .get(id) as any;
+  if (session && session.paused_at) {
+    const pausedDuration = Date.now() - session.paused_at;
+    db.prepare(
+      "UPDATE sessions SET paused_at = NULL, start_time = start_time + ?, total_paused_ms = total_paused_ms + ? WHERE id = ?",
+    ).run(pausedDuration, pausedDuration, id);
+  }
+  return db.prepare("SELECT * FROM sessions WHERE id = ?").get(id);
 });
 
 ipcMain.handle(

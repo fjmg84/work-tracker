@@ -32,6 +32,8 @@ export interface Session {
   start_time: number;
   end_time: number | null;
   notes: string;
+  paused_at: number | null;
+  total_paused_ms: number;
 }
 
 export interface SessionInput {
@@ -128,6 +130,8 @@ export interface DbApi {
   stopSession: (data: { id: number; end_time: number }) => Promise<Session>;
   deleteSession: (id: number) => Promise<boolean>;
   getActiveSession: () => Promise<Session | null>;
+  pauseSession: (data: { id: number }) => Promise<Session>;
+  resumeSession: (data: { id: number }) => Promise<Session>;
 }
 
 export interface GitHubApi {

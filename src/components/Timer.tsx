@@ -22,6 +22,8 @@ export default function Timer({ projects, onSessionChange }: TimerProps) {
   const [loading, setLoading] = useState<boolean>(true);
   const intervalRef = useRef<NodeJS.Timeout | null>(null);
 
+  const isPaused = activeSession?.paused_at !== null;
+
   useEffect(() => {
     async function load() {
       const session = await window.api.db.getActiveSession();
@@ -36,7 +38,7 @@ export default function Timer({ projects, onSessionChange }: TimerProps) {
   }, []);
 
   useEffect(() => {
-    if (activeSession) {
+    if (activeSession && !isPaused) {
       intervalRef.current = setInterval(() => {
         setElapsed(Date.now() - activeSession.start_time);
       }, 1000);
@@ -44,10 +46,15 @@ export default function Timer({ projects, onSessionChange }: TimerProps) {
         if (intervalRef.current) clearInterval(intervalRef.current);
       };
     } else {
-      setElapsed(0);
+      if (intervalRef.current) clearInterval(intervalRef.current);
+      if (activeSession && isPaused) {
+        setElapsed(activeSession.start_time - Date.now());
+      } else {
+        setElapsed(0);
+      }
       return undefined;
     }
-  }, [activeSession]);
+  }, [activeSession, isPaused]);
 
   const start = async () => {
     if (!selectedProjectId) return;
@@ -76,9 +83,21 @@ export default function Timer({ projects, onSessionChange }: TimerProps) {
     setActiveSession(null);
     setNotes("");
     onSessionChange();
-    alert(
-      `Sesión guardada: ${formatElapsed((updated.end_time ?? 0) - updated.start_time)}`,
-    );
+    const activeMs =
+      (updated.end_time ?? 0) - updated.start_time - updated.total_paused_ms;
+    alert(`Sesión guardada: ${formatElapsed(activeMs)}`);
+  };
+
+  const pause = async () => {
+    if (!activeSession || isPaused) return;
+    const updated = await window.api.db.pauseSession({ id: activeSession.id });
+    setActiveSession(updated);
+  };
+
+  const resume = async () => {
+    if (!activeSession || !isPaused) return;
+    const updated = await window.api.db.resumeSession({ id: activeSession.id });
+    setActiveSession(updated);
   };
 
   if (loading) return <div className="card">Cargando...</div>;
@@ -118,7 +137,10 @@ export default function Timer({ projects, onSessionChange }: TimerProps) {
         </div>
       </div>
 
-      <div className="timer-display">{formatElapsed(elapsed)}</div>
+      <div className="timer-display">
+        {formatElapsed(elapsed)}
+        {isPaused && <span className="badge badge-yellow ml-2">Pausado</span>}
+      </div>
 
       <div className="timer-controls">
         <button
@@ -131,12 +153,29 @@ export default function Timer({ projects, onSessionChange }: TimerProps) {
         <button className="danger" onClick={stop} disabled={!activeSession}>
           Stop
         </button>
+        {activeSession && !isPaused && (
+          <button className="secondary" onClick={pause}>
+            Pausar
+          </button>
+        )}
+        {activeSession && isPaused && (
+          <button className="primary" onClick={resume}>
+            Reanudar
+          </button>
+        )}
       </div>
 
       {activeSession && (
         <p className="small mt-2" style={{ textAlign: "center" }}>
           Sesión activa desde{" "}
           {new Date(activeSession.start_time).toLocaleString("es-ES")}
+          {activeSession.total_paused_ms > 0 && (
+            <span>
+              {" "}
+              · Pausado{" "}
+              {formatElapsed(activeSession.total_paused_ms)} en total
+            </span>
+          )}
         </p>
       )}
 
