@@ -21,6 +21,8 @@ contextBridge.exposeInMainWorld("api", {
     pauseSession: (data: any) => ipcRenderer.invoke("db:pauseSession", data),
     resumeSession: (data: any) =>
       ipcRenderer.invoke("db:resumeSession", data),
+    closeStaleSessions: (ids: any) =>
+      ipcRenderer.invoke("db:closeStaleSessions", ids),
   },
   github: {
     getUserActivity: (data: any) =>

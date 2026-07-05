@@ -21,6 +21,9 @@ export default function Timer({ projects, onSessionChange }: TimerProps) {
   const [notes, setNotes] = useState<string>("");
   const [loading, setLoading] = useState<boolean>(true);
   const intervalRef = useRef<NodeJS.Timeout | null>(null);
+  const [staleSessions, setStaleSessions] = useState<Session[]>([]);
+
+  const isPaused = activeSession?.paused_at !== null;
 
   useEffect(() => {
     async function load() {
@@ -52,12 +55,19 @@ export default function Timer({ projects, onSessionChange }: TimerProps) {
       });
     };
 
+    // Listen for stale sessions from main process
+    const handleStaleDetected = (sessions: Session[]) => {
+      setStaleSessions(sessions);
+    };
+
     window.api.on("session:auto-paused", handleAutoPause);
     window.api.on("session:resumed-from-suspend", handleResumeFromSuspend);
+    window.api.on("sessions:stale-detected", handleStaleDetected);
 
     return () => {
       window.api.on("session:auto-paused", () => {});
       window.api.on("session:resumed-from-suspend", () => {});
+      window.api.on("sessions:stale-detected", () => {});
     };
   }, []);
 
@@ -107,9 +117,29 @@ export default function Timer({ projects, onSessionChange }: TimerProps) {
     setActiveSession(null);
     setNotes("");
     onSessionChange();
-    alert(
-      `Sesión guardada: ${formatElapsed((updated.end_time ?? 0) - updated.start_time)}`,
-    );
+    const activeMs =
+      (updated.end_time ?? 0) - updated.start_time - updated.total_paused_ms;
+    alert(`Sesión guardada: ${formatElapsed(activeMs)}`);
+  };
+
+  const pause = async () => {
+    if (!activeSession || isPaused) return;
+    const updated = await window.api.db.pauseSession({ id: activeSession.id });
+    setActiveSession(updated);
+  };
+
+  const resume = async () => {
+    if (!activeSession || !isPaused) return;
+    const updated = await window.api.db.resumeSession({ id: activeSession.id });
+    setActiveSession(updated);
+  };
+
+  const closeStaleSessions = async () => {
+    const ids = staleSessions.map((s) => s.id);
+    await window.api.db.closeStaleSessions({ ids });
+    setStaleSessions([]);
+    onSessionChange();
+    alert(`${ids.length} sesiones antiguas cerradas.`);
   };
 
   if (loading) return <div className="card">Cargando...</div>;
@@ -117,6 +147,18 @@ export default function Timer({ projects, onSessionChange }: TimerProps) {
   return (
     <div className="card">
       <h3>Cronómetro</h3>
+
+      {staleSessions.length > 0 && (
+        <div className="stale-sessions-alert">
+          <p>
+            Se detectaron {staleSessions.length} sesiones activas de hace más
+            de 24 horas.
+          </p>
+          <button className="primary" onClick={closeStaleSessions}>
+            Cerrar sesiones antiguas
+          </button>
+        </div>
+      )}
 
       <div className="form-row">
         <div>
@@ -149,7 +191,10 @@ export default function Timer({ projects, onSessionChange }: TimerProps) {
         </div>
       </div>
 
-      <div className="timer-display">{formatElapsed(elapsed)}</div>
+      <div className="timer-display">
+        {formatElapsed(elapsed)}
+        {isPaused && <span className="badge badge-yellow ml-2">Pausado</span>}
+      </div>
 
       <div className="timer-controls">
         <button
@@ -162,12 +207,29 @@ export default function Timer({ projects, onSessionChange }: TimerProps) {
         <button className="danger" onClick={stop} disabled={!activeSession}>
           Stop
         </button>
+        {activeSession && !isPaused && (
+          <button className="secondary" onClick={pause}>
+            Pausar
+          </button>
+        )}
+        {activeSession && isPaused && (
+          <button className="primary" onClick={resume}>
+            Reanudar
+          </button>
+        )}
       </div>
 
       {activeSession && (
         <p className="small mt-2" style={{ textAlign: "center" }}>
           Sesión activa desde{" "}
           {new Date(activeSession.start_time).toLocaleString("es-ES")}
+          {activeSession.total_paused_ms > 0 && (
+            <span>
+              {" "}
+              · Pausado{" "}
+              {formatElapsed(activeSession.total_paused_ms)} en total
+            </span>
+          )}
         </p>
       )}
 
