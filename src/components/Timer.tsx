@@ -33,10 +33,36 @@ export default function Timer({ projects, onSessionChange }: TimerProps) {
       setLoading(false);
     }
     load();
+
+    // Listen for auto-pause events from idle detection
+    const handleAutoPause = () => {
+      window.api.db.getActiveSession().then((session) => {
+        if (session) {
+          setActiveSession(session);
+        }
+      });
+    };
+
+    // Listen for resume from suspend
+    const handleResumeFromSuspend = () => {
+      window.api.db.getActiveSession().then((session) => {
+        if (session) {
+          setActiveSession(session);
+        }
+      });
+    };
+
+    window.api.on("session:auto-paused", handleAutoPause);
+    window.api.on("session:resumed-from-suspend", handleResumeFromSuspend);
+
+    return () => {
+      window.api.on("session:auto-paused", () => {});
+      window.api.on("session:resumed-from-suspend", () => {});
+    };
   }, []);
 
   useEffect(() => {
-    if (activeSession) {
+    if (activeSession && !isPaused) {
       intervalRef.current = setInterval(() => {
         setElapsed(Date.now() - activeSession.start_time);
       }, 1000);
@@ -44,10 +70,15 @@ export default function Timer({ projects, onSessionChange }: TimerProps) {
         if (intervalRef.current) clearInterval(intervalRef.current);
       };
     } else {
-      setElapsed(0);
+      if (intervalRef.current) clearInterval(intervalRef.current);
+      if (activeSession && isPaused) {
+        setElapsed(0);
+      } else {
+        setElapsed(0);
+      }
       return undefined;
     }
-  }, [activeSession]);
+  }, [activeSession, isPaused]);
 
   const start = async () => {
     if (!selectedProjectId) return;
