@@ -31,7 +31,9 @@ db.exec(`
     project_id INTEGER NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
     start_time INTEGER NOT NULL,
     end_time INTEGER,
-    notes TEXT
+    notes TEXT,
+    paused_at INTEGER DEFAULT NULL,
+    total_paused_ms INTEGER DEFAULT 0
   );
 `);
 function safeStoreToken(accountId, token) {
@@ -76,8 +78,44 @@ function createWindow() {
         mainWindow = null;
     });
 }
-electron_1.app.whenReady().then(createWindow);
+electron_1.app.whenReady().then(() => {
+    createWindow();
+    // Power monitor: track suspend/resume
+    let suspendTimestamp = null;
+    electron_1.powerMonitor.on("suspend", () => {
+        suspendTimestamp = Date.now();
+    });
+    electron_1.powerMonitor.on("resume", () => {
+        if (suspendTimestamp) {
+            const suspendDuration = Date.now() - suspendTimestamp;
+            db.prepare("UPDATE sessions SET start_time = start_time + ?, total_paused_ms = total_paused_ms + ? WHERE end_time IS NULL").run(suspendDuration, suspendDuration);
+            suspendTimestamp = null;
+            // Notify renderer
+            mainWindow?.webContents.send("session:resumed-from-suspend");
+        }
+    });
+    // Idle detection: auto-pause after 10 minutes of inactivity
+    setInterval(() => {
+        const idleSeconds = electron_1.powerMonitor.getSystemIdleTime();
+        if (idleSeconds >= 600) {
+            const session = db
+                .prepare("SELECT * FROM sessions WHERE end_time IS NULL AND paused_at IS NULL")
+                .get();
+            if (session) {
+                db.prepare("UPDATE sessions SET paused_at = ? WHERE id = ?").run(Date.now(), session.id);
+                mainWindow?.webContents.send("session:auto-paused");
+            }
+        }
+    }, 60000);
+});
+function closeActiveSessions() {
+    db.prepare("UPDATE sessions SET end_time = ? WHERE end_time IS NULL").run(Date.now());
+}
+electron_1.app.on("before-quit", () => {
+    closeActiveSessions();
+});
 electron_1.app.on("window-all-closed", () => {
+    closeActiveSessions();
     if (process.platform !== "darwin")
         electron_1.app.quit();
 });
@@ -162,9 +200,28 @@ electron_1.ipcMain.handle("db:deleteSession", (_, id) => {
     db.prepare("DELETE FROM sessions WHERE id = ?").run(id);
     return true;
 });
+electron_1.ipcMain.handle("db:closeStaleSessions", (_, { ids }) => {
+    const placeholders = ids.map(() => "?").join(",");
+    db.prepare(`UPDATE sessions SET end_time = ? WHERE id IN (${placeholders})`).run(Date.now(), ...ids);
+    return true;
+});
 electron_1.ipcMain.handle("db:getActiveSession", () => {
     return (db.prepare("SELECT * FROM sessions WHERE end_time IS NULL LIMIT 1").get() ||
         null);
+});
+electron_1.ipcMain.handle("db:pauseSession", (_, { id }) => {
+    db.prepare("UPDATE sessions SET paused_at = ? WHERE id = ?").run(Date.now(), id);
+    return db.prepare("SELECT * FROM sessions WHERE id = ?").get(id);
+});
+electron_1.ipcMain.handle("db:resumeSession", (_, { id }) => {
+    const session = db
+        .prepare("SELECT * FROM sessions WHERE id = ?")
+        .get(id);
+    if (session && session.paused_at) {
+        const pausedDuration = Date.now() - session.paused_at;
+        db.prepare("UPDATE sessions SET paused_at = NULL, start_time = start_time + ?, total_paused_ms = total_paused_ms + ? WHERE id = ?").run(pausedDuration, pausedDuration, id);
+    }
+    return db.prepare("SELECT * FROM sessions WHERE id = ?").get(id);
 });
 electron_1.ipcMain.handle("github:getUserActivity", async (_, { accountId, repo, since, until }) => {
     const token = safeGetToken(accountId);
@@ -243,6 +300,16 @@ electron_1.ipcMain.handle("github:getUserActivity", async (_, { accountId, repo,
         }
     }));
     return { prs: prsWithCommits };
+});
+electron_1.ipcMain.handle("github:validateToken", async (_, { token }) => {
+    try {
+        const octokit = new rest_1.Octokit({ auth: token });
+        const { data } = await octokit.users.getAuthenticated();
+        return { valid: true, username: data.login };
+    }
+    catch (error) {
+        return { valid: false, error: error.message };
+    }
 });
 electron_1.ipcMain.handle("app:exportCsv", async (_, { filePath, content }) => {
     fs_1.default.writeFileSync(filePath, content, "utf8");

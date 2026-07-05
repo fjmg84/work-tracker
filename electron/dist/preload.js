@@ -16,13 +16,23 @@ electron_1.contextBridge.exposeInMainWorld("api", {
         stopSession: (data) => electron_1.ipcRenderer.invoke("db:stopSession", data),
         deleteSession: (id) => electron_1.ipcRenderer.invoke("db:deleteSession", id),
         getActiveSession: () => electron_1.ipcRenderer.invoke("db:getActiveSession"),
+        pauseSession: (data) => electron_1.ipcRenderer.invoke("db:pauseSession", data),
+        resumeSession: (data) => electron_1.ipcRenderer.invoke("db:resumeSession", data),
+        closeStaleSessions: (ids) => electron_1.ipcRenderer.invoke("db:closeStaleSessions", ids),
     },
     github: {
         getUserActivity: (data) => electron_1.ipcRenderer.invoke("github:getUserActivity", data),
-        validateToken: (token, expectedUsername) => electron_1.ipcRenderer.invoke("github:validateToken", token, expectedUsername),
+        validateToken: (data) => electron_1.ipcRenderer.invoke("github:validateToken", data),
     },
     app: {
         exportCsv: (data) => electron_1.ipcRenderer.invoke("app:exportCsv", data),
         showSaveDialog: (options) => electron_1.ipcRenderer.invoke("app:showSaveDialog", options),
+    },
+    on: (channel, callback) => {
+        const listener = (_event, ...args) => callback(...args);
+        electron_1.ipcRenderer.on(channel, listener);
+        return () => {
+            electron_1.ipcRenderer.removeListener(channel, listener);
+        };
     },
 });

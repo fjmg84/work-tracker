@@ -254,6 +254,14 @@ ipcMain.handle("db:deleteSession", (_, id) => {
   return true;
 });
 
+ipcMain.handle("db:closeStaleSessions", (_, { ids }) => {
+  const placeholders = ids.map(() => "?").join(",");
+  db.prepare(
+    `UPDATE sessions SET end_time = ? WHERE id IN (${placeholders})`,
+  ).run(Date.now(), ...ids);
+  return true;
+});
+
 ipcMain.handle("db:getActiveSession", () => {
   return (
     db.prepare("SELECT * FROM sessions WHERE end_time IS NULL LIMIT 1").get() ||

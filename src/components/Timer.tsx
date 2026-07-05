@@ -60,14 +60,14 @@ export default function Timer({ projects, onSessionChange }: TimerProps) {
       setStaleSessions(sessions);
     };
 
-    window.api.on("session:auto-paused", handleAutoPause);
-    window.api.on("session:resumed-from-suspend", handleResumeFromSuspend);
-    window.api.on("sessions:stale-detected", handleStaleDetected);
+    const unsubAutoPause = window.api.on("session:auto-paused", handleAutoPause);
+    const unsubResume = window.api.on("session:resumed-from-suspend", handleResumeFromSuspend);
+    const unsubStale = window.api.on("sessions:stale-detected", handleStaleDetected);
 
     return () => {
-      window.api.on("session:auto-paused", () => {});
-      window.api.on("session:resumed-from-suspend", () => {});
-      window.api.on("sessions:stale-detected", () => {});
+      unsubAutoPause();
+      unsubResume();
+      unsubStale();
     };
   }, []);
 

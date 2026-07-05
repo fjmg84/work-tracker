@@ -36,6 +36,10 @@ contextBridge.exposeInMainWorld("api", {
       ipcRenderer.invoke("app:showSaveDialog", options),
   },
   on: (channel: string, callback: (...args: any[]) => void) => {
-    ipcRenderer.on(channel, (_event, ...args) => callback(...args));
+    const listener = (_event: any, ...args: any[]) => callback(...args);
+    ipcRenderer.on(channel, listener);
+    return () => {
+      ipcRenderer.removeListener(channel, listener);
+    };
   },
 });

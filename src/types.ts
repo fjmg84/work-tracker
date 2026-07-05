@@ -132,6 +132,7 @@ export interface DbApi {
   getActiveSession: () => Promise<Session | null>;
   pauseSession: (data: { id: number }) => Promise<Session>;
   resumeSession: (data: { id: number }) => Promise<Session>;
+  closeStaleSessions: (data: { ids: number[] }) => Promise<boolean>;
 }
 
 export interface GitHubApi {
@@ -157,5 +158,5 @@ export interface Api {
   db: DbApi;
   github: GitHubApi;
   app: AppApi;
-  on: (channel: string, callback: (...args: any[]) => void) => void;
+  on: (channel: string, callback: (...args: any[]) => void) => () => void;
 }
