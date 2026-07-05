@@ -5,9 +5,13 @@ App de escritorio para registrar horas de trabajo, proyectos, PRs y commits de G
 ## Características
 
 - Registro de sesiones de trabajo por proyecto
+- Pausa/Reanudar manual de sesiones
+- Detección automática de inactividad (idle) y suspensión del sistema
+- Auto-cierre de sesiones activas mayores a 24 horas
 - Integración con GitHub para obtener PRs y commits
 - Generación de reportes mensuales en CSV
 - Almacenamiento seguro de tokens de GitHub
+- Tema oscuro/claro
 - Interfaz de escritorio con Electron y React
 
 ## Requisitos
@@ -138,12 +142,17 @@ Cada runner construye su propio instalador (con el `better-sqlite3` compilado pa
 work-tracker/
 ├── electron/           # Proceso principal de Electron
 │   ├── main.ts        # Proceso principal
-│   └── preload.ts     # Script de preload
+│   ├── preload.ts     # Script de preload
+│   └── db/            # Capa de base de datos
+│       ├── connection.ts   # Instancia SQLite
+│       ├── migrations.ts   # Schema inicial
+│       └── queries.ts      # Queries tipadas
 ├── src/               # Código del renderer (React)
 │   ├── components/    # Componentes React
-│   ├── lib/           # Utilidades
+│   ├── hooks/         # Custom hooks (useTheme)
 │   ├── types.ts       # Definiciones de tipos TypeScript
-│   └── global.d.ts    # Declaraciones globales
+│   ├── global.d.ts    # Declaraciones globales
+│   └── index.css      # Estilos Tailwind CSS
 ├── dist/              # Archivos compilados para producción
 ├── logs/              # Logs de la aplicación
 └── package.json       # Dependencias y scripts
@@ -175,7 +184,7 @@ Para integrar con GitHub, necesitas un token de acceso personal:
 
 ## Tecnología
 
-- **Frontend**: React 18, TypeScript
+- **Frontend**: React 18, TypeScript, Tailwind CSS
 - **Desktop**: Electron
 - **Build**: Vite
 - **Database**: SQLite (better-sqlite3)
