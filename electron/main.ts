@@ -91,7 +91,18 @@ function createWindow(): void {
 
 app.whenReady().then(createWindow);
 
+function closeActiveSessions(): void {
+  db.prepare("UPDATE sessions SET end_time = ? WHERE end_time IS NULL").run(
+    Date.now(),
+  );
+}
+
+app.on("before-quit", () => {
+  closeActiveSessions();
+});
+
 app.on("window-all-closed", () => {
+  closeActiveSessions();
   if (process.platform !== "darwin") app.quit();
 });
 
