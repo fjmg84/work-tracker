@@ -32,6 +32,8 @@ export interface Session {
   start_time: number;
   end_time: number | null;
   notes: string;
+  paused_at: number | null;
+  total_paused_ms: number;
 }
 
 export interface SessionInput {

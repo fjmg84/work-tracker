@@ -203,6 +203,47 @@ input:focus, select:focus, textarea:focus {
   color: #475569;
 }
 
+.badge-yellow {
+  background: #fef3c7;
+  color: #92400e;
+}
+
+.ml-2 {
+  margin-left: 8px;
+}
+
+.stale-sessions-alert {
+  background: #fef3c7;
+  border: 1px solid #f59e0b;
+  border-radius: 8px;
+  padding: 12px 16px;
+  margin-bottom: 16px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.stale-sessions-alert p {
+  color: #92400e;
+  font-size: 14px;
+  margin: 0;
+}
+
+.stale-sessions-alert button {
+  background: #f59e0b;
+  color: white;
+  border: none;
+  border-radius: 6px;
+  padding: 8px 16px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.stale-sessions-alert button:hover {
+  background: #d97706;
+}
+
 .session-list {
   margin-top: 12px;
 }
