@@ -166,18 +166,9 @@ export const sessionQueries = {
     { id, pausedDuration }: { id: number; pausedDuration: number },
   ) => {
     db.prepare(
-      "UPDATE sessions SET paused_at = NULL, start_time = start_time + ?, total_paused_ms = total_paused_ms + ? WHERE id = ?",
-    ).run(pausedDuration, pausedDuration, id);
+      "UPDATE sessions SET paused_at = NULL, total_paused_ms = total_paused_ms + ? WHERE id = ?",
+    ).run(pausedDuration, id);
     return db.prepare("SELECT * FROM sessions WHERE id = ?").get(id);
-  },
-
-  adjustForSuspend: (
-    db: Database.Database,
-    { suspendDuration }: { suspendDuration: number },
-  ) => {
-    db.prepare(
-      "UPDATE sessions SET start_time = start_time + ?, total_paused_ms = total_paused_ms + ? WHERE end_time IS NULL",
-    ).run(suspendDuration, suspendDuration);
   },
 
   markIdlePaused: (

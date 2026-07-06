@@ -72,19 +72,12 @@ function createWindow(): void {
 app.whenReady().then(() => {
   createWindow();
 
-  // Power monitor: track suspend/resume
-  let suspendTimestamp: number | null = null;
-
+  // Power monitor: auto-pause active session on suspend
   powerMonitor.on("suspend", () => {
-    suspendTimestamp = Date.now();
-  });
-
-  powerMonitor.on("resume", () => {
-    if (suspendTimestamp) {
-      const suspendDuration = Date.now() - suspendTimestamp;
-      sessionQueries.adjustForSuspend(db, { suspendDuration });
-      suspendTimestamp = null;
-      mainWindow?.webContents.send("session:resumed-from-suspend");
+    const session = sessionQueries.getActiveUnpaused(db);
+    if (session) {
+      sessionQueries.markIdlePaused(db, { id: session.id, paused_at: Date.now() });
+      mainWindow?.webContents.send("session:auto-paused");
     }
   });
 

@@ -74,7 +74,7 @@ export default function Timer({ projects, onSessionChange }: TimerProps) {
   useEffect(() => {
     if (activeSession && !isPaused) {
       intervalRef.current = setInterval(() => {
-        setElapsed(Date.now() - activeSession.start_time);
+        setElapsed(Date.now() - activeSession.start_time - activeSession.total_paused_ms);
       }, 1000);
       return () => {
         if (intervalRef.current) clearInterval(intervalRef.current);
@@ -82,7 +82,7 @@ export default function Timer({ projects, onSessionChange }: TimerProps) {
     } else {
       if (intervalRef.current) clearInterval(intervalRef.current);
       if (activeSession && isPaused) {
-        setElapsed(0);
+        setElapsed(activeSession.paused_at! - activeSession.start_time - activeSession.total_paused_ms);
       } else {
         setElapsed(0);
       }
@@ -112,7 +112,7 @@ export default function Timer({ projects, onSessionChange }: TimerProps) {
     if (!activeSession) return;
     const updated = await window.api.db.stopSession({
       id: activeSession.id,
-      end_time: Date.now(),
+      end_time: isPaused ? activeSession.paused_at! : Date.now(),
     });
     setActiveSession(null);
     setNotes("");
