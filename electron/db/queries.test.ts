@@ -121,7 +121,7 @@ describe("session pause/resume queries", () => {
     expect(paused.total_paused_ms).toBe(0);
   });
 
-  it("resume() clears paused_at and accumulates total_paused_ms", () => {
+  it("resume() clears paused_at and accumulates total_paused_ms without changing start_time", () => {
     const now = Date.now();
     sessionQueries.create(db, { project_id: 1, start_time: now });
     const session = sessionQueries.getActive(db) as any;
@@ -132,6 +132,7 @@ describe("session pause/resume queries", () => {
 
     expect(resumed.paused_at).toBeNull();
     expect(resumed.total_paused_ms).toBe(5000);
+    expect(resumed.start_time).toBe(now);
   });
 
   it("resume() accumulates across multiple pause/resume cycles", () => {
@@ -148,46 +149,22 @@ describe("session pause/resume queries", () => {
     const resumed = sessionQueries.resume(db, { id: session.id, pausedDuration: 7000 }) as any;
 
     expect(resumed.total_paused_ms).toBe(10000);
+    expect(resumed.start_time).toBe(now);
   });
 
-  it("adjustForSuspend() adds suspend time to active sessions", () => {
-    const now = Date.now();
-    sessionQueries.create(db, { project_id: 1, start_time: now });
-
-    sessionQueries.adjustForSuspend(db, { suspendDuration: 120000 }); // 2 min
-
-    const session = sessionQueries.getActive(db) as any;
-    expect(session.total_paused_ms).toBe(120000);
-    expect(session.start_time).toBe(now + 120000);
-  });
-
-  it("adjustForSuspend() does not affect paused sessions", () => {
+  it("markIdlePaused() pauses an active session for suspend auto-pause", () => {
     const now = Date.now();
     sessionQueries.create(db, { project_id: 1, start_time: now });
     const session = sessionQueries.getActive(db) as any;
 
-    sessionQueries.pause(db, { id: session.id, paused_at: now + 1000 });
+    expect(sessionQueries.getActiveUnpaused(db)).toBeTruthy();
 
-    // Suspend happens while paused — should still be tracked
-    sessionQueries.adjustForSuspend(db, { suspendDuration: 60000 });
+    sessionQueries.markIdlePaused(db, { id: session.id, paused_at: now + 1000 });
 
-    const updated = sessionQueries.getById(db, session.id) as any;
-    // paused sessions are also active (end_time IS NULL), so they get adjusted
-    expect(updated.total_paused_ms).toBe(60000);
-  });
-
-  it("adjustForSuspend() does not affect stopped sessions", () => {
-    const now = Date.now();
-    sessionQueries.create(db, { project_id: 1, start_time: now });
-    const session = sessionQueries.getActive(db) as any;
-
-    sessionQueries.stop(db, { id: session.id, end_time: now + 10000 });
-
-    sessionQueries.adjustForSuspend(db, { suspendDuration: 60000 });
-
-    const stopped = sessionQueries.getById(db, session.id) as any;
-    expect(stopped.total_paused_ms).toBe(0);
-    expect(stopped.end_time).toBe(now + 10000);
+    const updated = sessionQueries.getActive(db) as any;
+    expect(updated.paused_at).toBe(now + 1000);
+    expect(updated.start_time).toBe(now);
+    expect(sessionQueries.getActiveUnpaused(db)).toBeUndefined();
   });
 
   it("getActiveUnpaused() returns only unpaused active sessions", () => {
