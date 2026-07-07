@@ -314,7 +314,7 @@ ipcMain.handle("github:validateToken", async (_, { token }) => {
 // IPC: GitHub - Commit Diffs
 // ============================================================
 
-ipcMain.handle("github:getCommitDiffs", async (_, { accountId, repo, since, until }) => {
+async function fetchUserCommitsAndDiffs(accountId: number, repo: string, since: number, until: number) {
   const token = safeGetToken(accountId);
   if (!token) throw new Error("No se encontró token para esta cuenta.");
 
@@ -324,135 +324,39 @@ ipcMain.handle("github:getCommitDiffs", async (_, { accountId, repo, since, unti
 
   const [owner, repoName] = repo.split("/");
   if (!owner || !repoName) throw new Error("El formato del repo debe ser usuario/repo.");
-
-  let prs: any[];
-  try {
-    prs = await octokit.paginate(octokit.rest.pulls.list, {
-      owner,
-      repo: repoName,
-      state: "all",
-      per_page: 100,
-    });
-  } catch (error: any) {
-    throw new Error(`Error al obtener PRs: ${error.message}`);
-  }
-
-  const filteredPrs = prs
-    .filter((pr) => pr.user && pr.user.login === account.username)
-    .filter((pr) => {
-      const created = new Date(pr.created_at).getTime();
-      return created >= since && created <= until;
-    });
-
-  const allCommits: { sha: string; message: string; date: string }[] = [];
-  const allDiffs: { filename: string; patch: string; additions: number; deletions: number }[] = [];
-
-  for (const pr of filteredPrs) {
-    try {
-      const prCommits = await octokit.paginate(octokit.rest.pulls.listCommits, {
-        owner,
-        repo: repoName,
-        pull_number: pr.number,
-        per_page: 100,
-      });
-
-      for (const c of prCommits) {
-        if (c.author && c.author.login === account.username) {
-          allCommits.push({
-            sha: c.sha,
-            message: c.commit.message.split("\n")[0],
-            date: c.commit.committer?.date || "",
-          });
-        }
-      }
-
-      const files = await octokit.paginate(octokit.rest.pulls.listFiles, {
-        owner,
-        repo: repoName,
-        pull_number: pr.number,
-        per_page: 100,
-      });
-
-      for (const file of files) {
-        allDiffs.push({
-          filename: file.filename,
-          patch: file.patch || "",
-          additions: file.additions,
-          deletions: file.deletions,
-        });
-      }
-    } catch (error: any) {
-      console.error(`Error fetching data for PR #${pr.number}:`, error);
-    }
-  }
-
-  return { commits: allCommits, diffs: allDiffs };
-});
-
-// ============================================================
-// IPC: AI
-// ============================================================
-
-ipcMain.handle("ai:generatePrDescription", async (_, { accountId, repo, since, until, notes, language }) => {
-  const token = safeGetToken(accountId);
-  if (!token) throw new Error("No se encontró token para esta cuenta.");
-
-  const octokit = new Octokit({ auth: token });
-  const account = accountQueries.getById(db, accountId);
-  if (!account) throw new Error("Cuenta no encontrada.");
-
-  const [owner, repoName] = repo.split("/");
-  if (!owner || !repoName) throw new Error("El formato del repo debe ser usuario/repo.");
-
-  let prs: any[];
-  try {
-    prs = await octokit.paginate(octokit.rest.pulls.list, {
-      owner,
-      repo: repoName,
-      state: "all",
-      per_page: 100,
-    });
-  } catch (error: any) {
-    throw new Error(`Error al obtener PRs: ${error.message}`);
-  }
-
-  const filteredPrs = prs
-    .filter((pr) => pr.user && pr.user.login === account.username)
-    .filter((pr) => {
-      const created = new Date(pr.created_at).getTime();
-      return created >= since && created <= until;
-    });
 
   const commits: { sha: string; message: string; date: string }[] = [];
   const diffs: { filename: string; patch: string; additions: number; deletions: number }[] = [];
 
-  for (const pr of filteredPrs) {
+  let repoCommits: any[];
+  try {
+    repoCommits = await octokit.paginate(octokit.rest.repos.listCommits, {
+      owner,
+      repo: repoName,
+      author: account.username,
+      since: new Date(since).toISOString(),
+      until: new Date(until).toISOString(),
+      per_page: 100,
+    });
+  } catch (error: any) {
+    throw new Error(`Error al obtener commits: ${error.message}`);
+  }
+
+  for (const c of repoCommits) {
+    commits.push({
+      sha: c.sha,
+      message: c.commit.message.split("\n")[0],
+      date: c.commit.committer?.date || "",
+    });
+
     try {
-      const prCommits = await octokit.paginate(octokit.rest.pulls.listCommits, {
+      const commitData = await octokit.rest.repos.getCommit({
         owner,
         repo: repoName,
-        pull_number: pr.number,
-        per_page: 100,
+        ref: c.sha,
       });
 
-      for (const c of prCommits) {
-        if (c.author && c.author.login === account.username) {
-          commits.push({
-            sha: c.sha,
-            message: c.commit.message.split("\n")[0],
-            date: c.commit.committer?.date || "",
-          });
-        }
-      }
-
-      const files = await octokit.paginate(octokit.rest.pulls.listFiles, {
-        owner,
-        repo: repoName,
-        pull_number: pr.number,
-        per_page: 100,
-      });
-
-      for (const file of files) {
+      for (const file of commitData.data.files || []) {
         diffs.push({
           filename: file.filename,
           patch: file.patch || "",
@@ -461,9 +365,23 @@ ipcMain.handle("ai:generatePrDescription", async (_, { accountId, repo, since, u
         });
       }
     } catch (error: any) {
-      console.error(`Error fetching data for PR #${pr.number}:`, error);
+      console.error(`Error fetching diff for commit ${c.sha.substring(0, 7)}:`, error);
     }
   }
+
+  return { commits, diffs };
+}
+
+ipcMain.handle("github:getCommitDiffs", async (_, { accountId, repo, since, until }) => {
+  return fetchUserCommitsAndDiffs(accountId, repo, since, until);
+});
+
+// ============================================================
+// IPC: AI
+// ============================================================
+
+ipcMain.handle("ai:generatePrDescription", async (_, { accountId, repo, since, until, notes, language }) => {
+  const { commits, diffs } = await fetchUserCommitsAndDiffs(accountId, repo, since, until);
 
   if (commits.length === 0) {
     throw new Error("No se encontraron commits en el período seleccionado.");
