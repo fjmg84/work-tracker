@@ -23,6 +23,13 @@ electron_1.contextBridge.exposeInMainWorld("api", {
     github: {
         getUserActivity: (data) => electron_1.ipcRenderer.invoke("github:getUserActivity", data),
         validateToken: (data) => electron_1.ipcRenderer.invoke("github:validateToken", data),
+        getCommitDiffs: (data) => electron_1.ipcRenderer.invoke("github:getCommitDiffs", data),
+    },
+    ai: {
+        generatePrDescription: (data) => electron_1.ipcRenderer.invoke("ai:generatePrDescription", data),
+        getConfig: () => electron_1.ipcRenderer.invoke("ai:getConfig"),
+        saveConfig: (config) => electron_1.ipcRenderer.invoke("ai:saveConfig", config),
+        testConnection: () => electron_1.ipcRenderer.invoke("ai:testConnection"),
     },
     app: {
         exportCsv: (data) => electron_1.ipcRenderer.invoke("app:exportCsv", data),

@@ -10,6 +10,7 @@ const fs_1 = __importDefault(require("fs"));
 const connection_1 = __importDefault(require("./db/connection"));
 const migrations_1 = require("./db/migrations");
 const queries_1 = require("./db/queries");
+const ai_1 = require("./ai");
 const isDev = !electron_1.app.isPackaged;
 const PORT = 5170;
 (0, migrations_1.initializeSchema)(connection_1.default);
@@ -270,6 +271,164 @@ electron_1.ipcMain.handle("github:validateToken", async (_, { token }) => {
     catch (error) {
         return { valid: false, error: error.message };
     }
+});
+// ============================================================
+// IPC: GitHub - Commit Diffs
+// ============================================================
+electron_1.ipcMain.handle("github:getCommitDiffs", async (_, { accountId, repo, since, until }) => {
+    const token = safeGetToken(accountId);
+    if (!token)
+        throw new Error("No se encontró token para esta cuenta.");
+    const octokit = new rest_1.Octokit({ auth: token });
+    const account = queries_1.accountQueries.getById(connection_1.default, accountId);
+    if (!account)
+        throw new Error("Cuenta no encontrada.");
+    const [owner, repoName] = repo.split("/");
+    if (!owner || !repoName)
+        throw new Error("El formato del repo debe ser usuario/repo.");
+    let prs;
+    try {
+        prs = await octokit.paginate(octokit.rest.pulls.list, {
+            owner,
+            repo: repoName,
+            state: "all",
+            per_page: 100,
+        });
+    }
+    catch (error) {
+        throw new Error(`Error al obtener PRs: ${error.message}`);
+    }
+    const filteredPrs = prs
+        .filter((pr) => pr.user && pr.user.login === account.username)
+        .filter((pr) => {
+        const created = new Date(pr.created_at).getTime();
+        return created >= since && created <= until;
+    });
+    const allCommits = [];
+    const allDiffs = [];
+    for (const pr of filteredPrs) {
+        try {
+            const prCommits = await octokit.paginate(octokit.rest.pulls.listCommits, {
+                owner,
+                repo: repoName,
+                pull_number: pr.number,
+                per_page: 100,
+            });
+            for (const c of prCommits) {
+                if (c.author && c.author.login === account.username) {
+                    allCommits.push({
+                        sha: c.sha,
+                        message: c.commit.message.split("\n")[0],
+                        date: c.commit.committer?.date || "",
+                    });
+                }
+            }
+            const files = await octokit.paginate(octokit.rest.pulls.listFiles, {
+                owner,
+                repo: repoName,
+                pull_number: pr.number,
+                per_page: 100,
+            });
+            for (const file of files) {
+                allDiffs.push({
+                    filename: file.filename,
+                    patch: file.patch || "",
+                    additions: file.additions,
+                    deletions: file.deletions,
+                });
+            }
+        }
+        catch (error) {
+            console.error(`Error fetching data for PR #${pr.number}:`, error);
+        }
+    }
+    return { commits: allCommits, diffs: allDiffs };
+});
+// ============================================================
+// IPC: AI
+// ============================================================
+electron_1.ipcMain.handle("ai:generatePrDescription", async (_, { accountId, repo, since, until, notes, language }) => {
+    const token = safeGetToken(accountId);
+    if (!token)
+        throw new Error("No se encontró token para esta cuenta.");
+    const octokit = new rest_1.Octokit({ auth: token });
+    const account = queries_1.accountQueries.getById(connection_1.default, accountId);
+    if (!account)
+        throw new Error("Cuenta no encontrada.");
+    const [owner, repoName] = repo.split("/");
+    if (!owner || !repoName)
+        throw new Error("El formato del repo debe ser usuario/repo.");
+    let prs;
+    try {
+        prs = await octokit.paginate(octokit.rest.pulls.list, {
+            owner,
+            repo: repoName,
+            state: "all",
+            per_page: 100,
+        });
+    }
+    catch (error) {
+        throw new Error(`Error al obtener PRs: ${error.message}`);
+    }
+    const filteredPrs = prs
+        .filter((pr) => pr.user && pr.user.login === account.username)
+        .filter((pr) => {
+        const created = new Date(pr.created_at).getTime();
+        return created >= since && created <= until;
+    });
+    const commits = [];
+    const diffs = [];
+    for (const pr of filteredPrs) {
+        try {
+            const prCommits = await octokit.paginate(octokit.rest.pulls.listCommits, {
+                owner,
+                repo: repoName,
+                pull_number: pr.number,
+                per_page: 100,
+            });
+            for (const c of prCommits) {
+                if (c.author && c.author.login === account.username) {
+                    commits.push({
+                        sha: c.sha,
+                        message: c.commit.message.split("\n")[0],
+                        date: c.commit.committer?.date || "",
+                    });
+                }
+            }
+            const files = await octokit.paginate(octokit.rest.pulls.listFiles, {
+                owner,
+                repo: repoName,
+                pull_number: pr.number,
+                per_page: 100,
+            });
+            for (const file of files) {
+                diffs.push({
+                    filename: file.filename,
+                    patch: file.patch || "",
+                    additions: file.additions,
+                    deletions: file.deletions,
+                });
+            }
+        }
+        catch (error) {
+            console.error(`Error fetching data for PR #${pr.number}:`, error);
+        }
+    }
+    if (commits.length === 0) {
+        throw new Error("No se encontraron commits en el período seleccionado.");
+    }
+    const description = await (0, ai_1.generatePrDescription)({ commits, diffs, notes, language });
+    return { description };
+});
+electron_1.ipcMain.handle("ai:getConfig", () => {
+    return (0, ai_1.loadAiConfig)();
+});
+electron_1.ipcMain.handle("ai:saveConfig", (_, config) => {
+    (0, ai_1.saveAiConfig)(config);
+    return true;
+});
+electron_1.ipcMain.handle("ai:testConnection", () => {
+    return (0, ai_1.testAiConnection)();
 });
 // ============================================================
 // IPC: App

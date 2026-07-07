@@ -29,6 +29,15 @@ contextBridge.exposeInMainWorld("api", {
       ipcRenderer.invoke("github:getUserActivity", data),
     validateToken: (data: any) =>
       ipcRenderer.invoke("github:validateToken", data),
+    getCommitDiffs: (data: any) =>
+      ipcRenderer.invoke("github:getCommitDiffs", data),
+  },
+  ai: {
+    generatePrDescription: (data: any) =>
+      ipcRenderer.invoke("ai:generatePrDescription", data),
+    getConfig: () => ipcRenderer.invoke("ai:getConfig"),
+    saveConfig: (config: any) => ipcRenderer.invoke("ai:saveConfig", config),
+    testConnection: () => ipcRenderer.invoke("ai:testConnection"),
   },
   app: {
     exportCsv: (data: any) => ipcRenderer.invoke("app:exportCsv", data),

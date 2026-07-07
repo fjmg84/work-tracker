@@ -5,6 +5,7 @@ import fs from "fs";
 import db from "./db/connection";
 import { initializeSchema } from "./db/migrations";
 import { accountQueries, projectQueries, sessionQueries } from "./db/queries";
+import { generatePrDescription, loadAiConfig, saveAiConfig, testAiConnection } from "./ai";
 
 const isDev = !app.isPackaged;
 const PORT = 5170;
@@ -307,6 +308,182 @@ ipcMain.handle("github:validateToken", async (_, { token }) => {
   } catch (error: any) {
     return { valid: false, error: error.message };
   }
+});
+
+// ============================================================
+// IPC: GitHub - Commit Diffs
+// ============================================================
+
+ipcMain.handle("github:getCommitDiffs", async (_, { accountId, repo, since, until }) => {
+  const token = safeGetToken(accountId);
+  if (!token) throw new Error("No se encontró token para esta cuenta.");
+
+  const octokit = new Octokit({ auth: token });
+  const account = accountQueries.getById(db, accountId);
+  if (!account) throw new Error("Cuenta no encontrada.");
+
+  const [owner, repoName] = repo.split("/");
+  if (!owner || !repoName) throw new Error("El formato del repo debe ser usuario/repo.");
+
+  let prs: any[];
+  try {
+    prs = await octokit.paginate(octokit.rest.pulls.list, {
+      owner,
+      repo: repoName,
+      state: "all",
+      per_page: 100,
+    });
+  } catch (error: any) {
+    throw new Error(`Error al obtener PRs: ${error.message}`);
+  }
+
+  const filteredPrs = prs
+    .filter((pr) => pr.user && pr.user.login === account.username)
+    .filter((pr) => {
+      const created = new Date(pr.created_at).getTime();
+      return created >= since && created <= until;
+    });
+
+  const allCommits: { sha: string; message: string; date: string }[] = [];
+  const allDiffs: { filename: string; patch: string; additions: number; deletions: number }[] = [];
+
+  for (const pr of filteredPrs) {
+    try {
+      const prCommits = await octokit.paginate(octokit.rest.pulls.listCommits, {
+        owner,
+        repo: repoName,
+        pull_number: pr.number,
+        per_page: 100,
+      });
+
+      for (const c of prCommits) {
+        if (c.author && c.author.login === account.username) {
+          allCommits.push({
+            sha: c.sha,
+            message: c.commit.message.split("\n")[0],
+            date: c.commit.committer?.date || "",
+          });
+        }
+      }
+
+      const files = await octokit.paginate(octokit.rest.pulls.listFiles, {
+        owner,
+        repo: repoName,
+        pull_number: pr.number,
+        per_page: 100,
+      });
+
+      for (const file of files) {
+        allDiffs.push({
+          filename: file.filename,
+          patch: file.patch || "",
+          additions: file.additions,
+          deletions: file.deletions,
+        });
+      }
+    } catch (error: any) {
+      console.error(`Error fetching data for PR #${pr.number}:`, error);
+    }
+  }
+
+  return { commits: allCommits, diffs: allDiffs };
+});
+
+// ============================================================
+// IPC: AI
+// ============================================================
+
+ipcMain.handle("ai:generatePrDescription", async (_, { accountId, repo, since, until, notes, language }) => {
+  const token = safeGetToken(accountId);
+  if (!token) throw new Error("No se encontró token para esta cuenta.");
+
+  const octokit = new Octokit({ auth: token });
+  const account = accountQueries.getById(db, accountId);
+  if (!account) throw new Error("Cuenta no encontrada.");
+
+  const [owner, repoName] = repo.split("/");
+  if (!owner || !repoName) throw new Error("El formato del repo debe ser usuario/repo.");
+
+  let prs: any[];
+  try {
+    prs = await octokit.paginate(octokit.rest.pulls.list, {
+      owner,
+      repo: repoName,
+      state: "all",
+      per_page: 100,
+    });
+  } catch (error: any) {
+    throw new Error(`Error al obtener PRs: ${error.message}`);
+  }
+
+  const filteredPrs = prs
+    .filter((pr) => pr.user && pr.user.login === account.username)
+    .filter((pr) => {
+      const created = new Date(pr.created_at).getTime();
+      return created >= since && created <= until;
+    });
+
+  const commits: { sha: string; message: string; date: string }[] = [];
+  const diffs: { filename: string; patch: string; additions: number; deletions: number }[] = [];
+
+  for (const pr of filteredPrs) {
+    try {
+      const prCommits = await octokit.paginate(octokit.rest.pulls.listCommits, {
+        owner,
+        repo: repoName,
+        pull_number: pr.number,
+        per_page: 100,
+      });
+
+      for (const c of prCommits) {
+        if (c.author && c.author.login === account.username) {
+          commits.push({
+            sha: c.sha,
+            message: c.commit.message.split("\n")[0],
+            date: c.commit.committer?.date || "",
+          });
+        }
+      }
+
+      const files = await octokit.paginate(octokit.rest.pulls.listFiles, {
+        owner,
+        repo: repoName,
+        pull_number: pr.number,
+        per_page: 100,
+      });
+
+      for (const file of files) {
+        diffs.push({
+          filename: file.filename,
+          patch: file.patch || "",
+          additions: file.additions,
+          deletions: file.deletions,
+        });
+      }
+    } catch (error: any) {
+      console.error(`Error fetching data for PR #${pr.number}:`, error);
+    }
+  }
+
+  if (commits.length === 0) {
+    throw new Error("No se encontraron commits en el período seleccionado.");
+  }
+
+  const description = await generatePrDescription({ commits, diffs, notes, language });
+  return { description };
+});
+
+ipcMain.handle("ai:getConfig", () => {
+  return loadAiConfig();
+});
+
+ipcMain.handle("ai:saveConfig", (_, config) => {
+  saveAiConfig(config);
+  return true;
+});
+
+ipcMain.handle("ai:testConnection", () => {
+  return testAiConnection();
 });
 
 // ============================================================
