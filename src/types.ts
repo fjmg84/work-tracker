@@ -184,7 +184,16 @@ export interface PrDescriptionResponse {
 
 export interface AiApi {
   generatePrDescription: (data: PrDescriptionRequest) => Promise<PrDescriptionResponse>;
+  generatePrDescriptionFromPr: (data: PrDescriptionFromPrRequest) => Promise<PrDescriptionResponse>;
   getConfig: () => Promise<AiProviderConfig | null>;
   saveConfig: (config: AiProviderConfig) => Promise<boolean>;
   testConnection: () => Promise<{ success: boolean; error?: string }>;
+}
+
+export interface PrDescriptionFromPrRequest {
+  accountId: number;
+  repo: string;
+  prNumber: number;
+  notes: string;
+  language: Language;
 }

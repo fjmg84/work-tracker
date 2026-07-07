@@ -372,6 +372,65 @@ async function fetchUserCommitsAndDiffs(accountId: number, repo: string, since: 
   return { commits, diffs };
 }
 
+async function fetchPrCommitsAndDiffs(accountId: number, repo: string, prNumber: number) {
+  const token = safeGetToken(accountId);
+  if (!token) throw new Error("No se encontró token para esta cuenta.");
+
+  const octokit = new Octokit({ auth: token });
+  const account = accountQueries.getById(db, accountId);
+  if (!account) throw new Error("Cuenta no encontrada.");
+
+  const [owner, repoName] = repo.split("/");
+  if (!owner || !repoName) throw new Error("El formato del repo debe ser usuario/repo.");
+
+  const commits: { sha: string; message: string; date: string }[] = [];
+  const diffs: { filename: string; patch: string; additions: number; deletions: number }[] = [];
+
+  let prCommits: any[];
+  try {
+    prCommits = await octokit.paginate(octokit.rest.pulls.listCommits, {
+      owner,
+      repo: repoName,
+      pull_number: prNumber,
+      per_page: 100,
+    });
+  } catch (error: any) {
+    throw new Error(`Error al obtener commits del PR #${prNumber}: ${error.message}`);
+  }
+
+  for (const c of prCommits) {
+    if (c.author && c.author.login === account.username) {
+      commits.push({
+        sha: c.sha,
+        message: c.commit.message.split("\n")[0],
+        date: c.commit.committer?.date || "",
+      });
+    }
+  }
+
+  try {
+    const files = await octokit.paginate(octokit.rest.pulls.listFiles, {
+      owner,
+      repo: repoName,
+      pull_number: prNumber,
+      per_page: 100,
+    });
+
+    for (const file of files) {
+      diffs.push({
+        filename: file.filename,
+        patch: file.patch || "",
+        additions: file.additions,
+        deletions: file.deletions,
+      });
+    }
+  } catch (error: any) {
+    console.error(`Error fetching diffs for PR #${prNumber}:`, error);
+  }
+
+  return { commits, diffs };
+}
+
 ipcMain.handle("github:getCommitDiffs", async (_, { accountId, repo, since, until }) => {
   return fetchUserCommitsAndDiffs(accountId, repo, since, until);
 });
@@ -385,6 +444,17 @@ ipcMain.handle("ai:generatePrDescription", async (_, { accountId, repo, since, u
 
   if (commits.length === 0) {
     throw new Error("No se encontraron commits en el período seleccionado.");
+  }
+
+  const description = await generatePrDescription({ commits, diffs, notes, language });
+  return { description };
+});
+
+ipcMain.handle("ai:generatePrDescriptionFromPr", async (_, { accountId, repo, prNumber, notes, language }) => {
+  const { commits, diffs } = await fetchPrCommitsAndDiffs(accountId, repo, prNumber);
+
+  if (commits.length === 0) {
+    throw new Error("No se encontraron commits en el PR seleccionado.");
   }
 
   const description = await generatePrDescription({ commits, diffs, notes, language });

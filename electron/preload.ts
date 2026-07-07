@@ -35,6 +35,8 @@ contextBridge.exposeInMainWorld("api", {
   ai: {
     generatePrDescription: (data: any) =>
       ipcRenderer.invoke("ai:generatePrDescription", data),
+    generatePrDescriptionFromPr: (data: any) =>
+      ipcRenderer.invoke("ai:generatePrDescriptionFromPr", data),
     getConfig: () => ipcRenderer.invoke("ai:getConfig"),
     saveConfig: (config: any) => ipcRenderer.invoke("ai:saveConfig", config),
     testConnection: () => ipcRenderer.invoke("ai:testConnection"),

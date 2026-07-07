@@ -27,6 +27,7 @@ electron_1.contextBridge.exposeInMainWorld("api", {
     },
     ai: {
         generatePrDescription: (data) => electron_1.ipcRenderer.invoke("ai:generatePrDescription", data),
+        generatePrDescriptionFromPr: (data) => electron_1.ipcRenderer.invoke("ai:generatePrDescriptionFromPr", data),
         getConfig: () => electron_1.ipcRenderer.invoke("ai:getConfig"),
         saveConfig: (config) => electron_1.ipcRenderer.invoke("ai:saveConfig", config),
         testConnection: () => electron_1.ipcRenderer.invoke("ai:testConnection"),

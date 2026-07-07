@@ -16,8 +16,9 @@ interface PrDescriptionModalProps {
   onClose: () => void;
   accountId: number;
   repo: string;
-  startTime: number;
-  endTime: number;
+  startTime?: number;
+  endTime?: number;
+  prNumber?: number;
   notes: string;
 }
 
@@ -36,6 +37,7 @@ export default function PrDescriptionModal({
   repo,
   startTime,
   endTime,
+  prNumber,
   notes,
 }: PrDescriptionModalProps) {
   const [language, setLanguage] = useState<Language>("es");
@@ -72,14 +74,25 @@ export default function PrDescriptionModal({
     setLoading(true);
     setError(null);
     try {
-      const result = await window.api.ai.generatePrDescription({
-        accountId,
-        repo,
-        since: startTime,
-        until: endTime,
-        notes,
-        language,
-      });
+      let result;
+      if (prNumber) {
+        result = await window.api.ai.generatePrDescriptionFromPr({
+          accountId,
+          repo,
+          prNumber,
+          notes,
+          language,
+        });
+      } else {
+        result = await window.api.ai.generatePrDescription({
+          accountId,
+          repo,
+          since: startTime!,
+          until: endTime!,
+          notes,
+          language,
+        });
+      }
       setDescription(result.description);
     } catch (err: any) {
       setError(err.message);

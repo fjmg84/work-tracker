@@ -33,8 +33,7 @@ export default function Activity({ projects }: ActivityProps) {
   const [selectedPr, setSelectedPr] = useState<{
     accountId: number;
     repo: string;
-    since: number;
-    until: number;
+    prNumber: number;
   } | null>(null);
 
   const toggleRepo = (repo: string) => {
@@ -48,21 +47,14 @@ export default function Activity({ projects }: ActivityProps) {
   };
 
   const openPrDescription = (pr: PullRequest) => {
-    const project = projects.find((p) => p.repo === pr.html_url.split("/").slice(3, 5).join("/"));
+    const repoSlug = pr.html_url.split("/").slice(3, 5).join("/");
+    const project = projects.find((p) => p.repo === repoSlug);
     if (!project) return;
-
-    const commits = pr.commits || [];
-    if (commits.length === 0) return;
-
-    const dates = commits.map((c) => new Date(c.date).getTime());
-    const since = Math.min(...dates);
-    const until = Math.max(...dates);
 
     setSelectedPr({
       accountId: project.account_id,
       repo: project.repo,
-      since,
-      until,
+      prNumber: pr.number,
     });
     setShowPrModal(true);
   };
@@ -317,8 +309,7 @@ export default function Activity({ projects }: ActivityProps) {
           }}
           accountId={selectedPr.accountId}
           repo={selectedPr.repo}
-          startTime={selectedPr.since}
-          endTime={selectedPr.until}
+          prNumber={selectedPr.prNumber}
           notes=""
         />
       )}
