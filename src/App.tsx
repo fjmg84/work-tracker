@@ -6,18 +6,48 @@ import Reports from "./components/Reports";
 import Activity from "./components/Activity";
 import { Project, Account } from "./types";
 import { useTheme } from "./hooks/useTheme";
+import {
+  Timer as TimerIcon,
+  FolderGit2,
+  User,
+  Activity as ActivityIcon,
+  BarChart3,
+  Moon,
+  Sun,
+} from "lucide-react";
 
 interface Tab {
   id: string;
   label: string;
+  icon: React.ReactNode;
 }
 
 const TABS: Tab[] = [
-  { id: "timer", label: "Cronómetro" },
-  { id: "projects", label: "Proyectos" },
-  { id: "accounts", label: "Cuentas GitHub" },
-  { id: "activity", label: "Actividad" },
-  { id: "reports", label: "Reportes" },
+  {
+    id: "timer",
+    label: "Cronómetro",
+    icon: <TimerIcon className="w-[18px] h-[18px]" />,
+  },
+  {
+    id: "projects",
+    label: "Proyectos",
+    icon: <FolderGit2 className="w-[18px] h-[18px]" />,
+  },
+  {
+    id: "accounts",
+    label: "Cuentas GitHub",
+    icon: <User className="w-[18px] h-[18px]" />,
+  },
+  {
+    id: "activity",
+    label: "Actividad",
+    icon: <ActivityIcon className="w-[18px] h-[18px]" />,
+  },
+  {
+    id: "reports",
+    label: "Reportes",
+    icon: <BarChart3 className="w-[18px] h-[18px]" />,
+  },
 ];
 
 export default function App() {
@@ -69,30 +99,42 @@ export default function App() {
           </div>
           <button
             onClick={toggleTheme}
-            className="btn btn-secondary p-2"
+            className="btn btn-ghost p-2"
             aria-label="Toggle theme"
           >
-            {theme === "light" ? "🌙" : "☀️"}
+            {theme === "light" ? (
+              <Moon className="w-5 h-5" />
+            ) : (
+              <Sun className="w-5 h-5" />
+            )}
           </button>
         </div>
 
-        <div className="flex gap-2 mb-5 border-b border-[var(--color-border-light)] dark:border-[var(--color-border-dark)] pb-2">
+        <div
+          className="flex gap-2 mb-5 border-b border-[var(--color-border-light)] dark:border-[var(--color-border-dark)] pb-2"
+          role="tablist"
+        >
           {TABS.map((tab) => (
             <button
               key={tab.id}
-              className={`px-4 py-2 rounded-t-md text-sm transition-colors ${
+              role="tab"
+              aria-selected={activeTab === tab.id}
+              className={`flex items-center gap-2 px-4 py-2 rounded-t-md text-sm transition-colors ${
                 activeTab === tab.id
-                  ? "bg-[var(--color-surface-muted-light)] dark:bg-[var(--color-surface-muted-dark)] text-[var(--color-primary)] font-medium"
-                  : "text-[var(--color-text-muted-light)] dark:text-[var(--color-text-muted-dark)] hover:text-[var(--color-text-light)] dark:hover:text-[var(--color-text-dark)]"
+                  ? "bg-[var(--color-surface-muted-light)] dark:bg-[var(--color-surface-muted-dark)] text-[var(--color-primary)] font-medium border-b-2 border-[var(--color-primary)]"
+                  : "text-[var(--color-text-muted-light)] dark:text-[var(--color-text-muted-dark)] hover:text-[var(--color-text-light)] dark:hover:text-[var(--color-text-dark)] border-b-2 border-transparent"
               }`}
               onClick={() => setActiveTab(tab.id)}
             >
+              {tab.icon}
               {tab.label}
             </button>
           ))}
         </div>
 
-        {renderTab()}
+        <div key={activeTab} className="animate-fade-in">
+          {renderTab()}
+        </div>
       </div>
     </div>
   );

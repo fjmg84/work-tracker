@@ -1,5 +1,7 @@
-import { useState } from "react";
+import { FormEvent, useState } from "react";
 import { Account } from "../types";
+import { Pencil, Trash2, Plus, Key } from "lucide-react";
+import { toast } from "sonner";
 
 interface AccountsProps {
   accounts: Account[];
@@ -31,7 +33,7 @@ export default function Accounts({ accounts, onChange }: AccountsProps) {
     setEditing({ id: 0, label: "", username: "" });
   };
 
-  const save = async (e: React.FormEvent) => {
+  const save = async (e: FormEvent) => {
     e.preventDefault();
     if (!label.trim() || !username.trim()) return;
 
@@ -39,11 +41,11 @@ export default function Accounts({ accounts, onChange }: AccountsProps) {
       if (token.trim()) {
         const result = await window.api.github.validateToken({ token });
         if (!result.valid) {
-          alert(`Token inválido: ${result.error}`);
+          toast.error(`Token inválido: ${result.error}`);
           return;
         }
         if (result.username && result.username !== username.trim()) {
-          alert(
+          toast.error(
             `El token pertenece al usuario "${result.username}", no a "${username.trim()}".`,
           );
           return;
@@ -55,37 +57,48 @@ export default function Accounts({ accounts, onChange }: AccountsProps) {
         username,
         token: token || undefined,
       });
+      toast.success("Cuenta actualizada");
     } else {
       if (!token.trim()) {
-        alert("El token es obligatorio para una nueva cuenta.");
+        toast.error("El token es obligatorio para una nueva cuenta.");
         return;
       }
       const result = await window.api.github.validateToken({ token });
       if (!result.valid) {
-        alert(`Token inválido: ${result.error}`);
+        toast.error(`Token inválido: ${result.error}`);
         return;
       }
       if (result.username && result.username !== username.trim()) {
-        alert(
+        toast.error(
           `El token pertenece al usuario "${result.username}", no a "${username.trim()}".`,
         );
         return;
       }
       await window.api.db.createAccount({ label, username, token });
+      toast.success("Cuenta creada");
     }
     reset();
     onChange();
   };
 
   const remove = async (id: number) => {
-    if (
-      !confirm(
-        "¿Eliminar esta cuenta? Se perderán también los proyectos asociados.",
-      )
-    )
-      return;
-    await window.api.db.deleteAccount(id);
-    onChange();
+    toast(
+      "¿Eliminar esta cuenta? Se perderán también los proyectos asociados.",
+      {
+        action: {
+          label: "Eliminar",
+          onClick: async () => {
+            await window.api.db.deleteAccount(id);
+            onChange();
+            toast.success("Cuenta eliminada");
+          },
+        },
+        cancel: {
+          label: "Cancelar",
+          onClick: () => {},
+        },
+      },
+    );
   };
 
   return (
@@ -96,14 +109,17 @@ export default function Accounts({ accounts, onChange }: AccountsProps) {
 
       <ul className="list-none mb-3">
         {accounts.length === 0 && (
-          <li className="text-[var(--color-text-muted-light)] dark:text-[var(--color-text-muted-dark)] text-center py-5 italic">
-            No hay cuentas registradas.
+          <li className="text-center py-8">
+            <Key className="w-12 h-12 mx-auto text-[var(--color-text-muted-light)] dark:text-[var(--color-text-muted-dark)] mb-3" />
+            <p className="text-[var(--color-text-muted-light)] dark:text-[var(--color-text-muted-dark)]">
+              No hay cuentas registradas.
+            </p>
           </li>
         )}
         {accounts.map((a) => (
           <li
             key={a.id}
-            className="flex justify-between items-center py-2.5 border-b border-[var(--color-border-light)] dark:border-[var(--color-border-dark)] last:border-b-0"
+            className="flex justify-between items-center py-3 border-b border-[var(--color-border-light)] dark:border-[var(--color-border-dark)] last:border-b-0 hover:bg-[var(--color-surface-muted-light)] dark:hover:bg-[var(--color-surface-muted-dark)] transition-colors rounded-md px-2 -mx-2"
           >
             <div>
               <strong className="text-[var(--color-text-light)] dark:text-[var(--color-text-dark)]">
@@ -115,20 +131,31 @@ export default function Accounts({ accounts, onChange }: AccountsProps) {
             </div>
             <div className="flex gap-2">
               <button
-                className="btn btn-secondary"
+                className="btn btn-secondary flex items-center gap-2"
                 onClick={() => startEdit(a)}
+                aria-label="Editar cuenta"
               >
-                Editar
+                <Pencil className="w-4 h-4" />
+                <span className="hidden sm:inline">Editar</span>
               </button>
-              <button className="btn btn-danger" onClick={() => remove(a.id)}>
-                Eliminar
+              <button
+                className="btn btn-danger flex items-center gap-2"
+                onClick={() => remove(a.id)}
+                aria-label="Eliminar cuenta"
+              >
+                <Trash2 className="w-4 h-4" />
+                <span className="hidden sm:inline">Eliminar</span>
               </button>
             </div>
           </li>
         ))}
       </ul>
 
-      <button className="btn btn-primary" onClick={startNew}>
+      <button
+        className="btn btn-primary flex items-center justify-center gap-2"
+        onClick={startNew}
+      >
+        <Plus className="w-4 h-4" />
         Agregar cuenta
       </button>
 
