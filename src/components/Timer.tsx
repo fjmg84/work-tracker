@@ -9,6 +9,7 @@ import {
   AlertCircle,
 } from "lucide-react";
 import { toast } from "sonner";
+import PrDescriptionModal from "./PrDescriptionModal";
 
 interface TimerProps {
   projects: Project[];
@@ -31,6 +32,13 @@ export default function Timer({ projects, onSessionChange }: TimerProps) {
   const [loading, setLoading] = useState<boolean>(true);
   const intervalRef = useRef<NodeJS.Timeout | null>(null);
   const [staleSessions, setStaleSessions] = useState<Session[]>([]);
+  const [showPrModal, setShowPrModal] = useState<boolean>(false);
+  const [stoppedSession, setStoppedSession] = useState<{
+    projectId: number;
+    startTime: number;
+    endTime: number;
+    notes: string;
+  } | null>(null);
 
   const isPaused = activeSession !== null && activeSession.paused_at !== null;
 
@@ -120,10 +128,21 @@ export default function Timer({ projects, onSessionChange }: TimerProps) {
 
   const stop = async () => {
     if (!activeSession) return;
+    const endTime = isPaused ? activeSession.paused_at! : Date.now();
     const updated = await window.api.db.stopSession({
       id: activeSession.id,
-      end_time: isPaused ? activeSession.paused_at! : Date.now(),
+      end_time: endTime,
     });
+    const project = projects.find((p) => p.id === activeSession.project_id);
+    if (project) {
+      setStoppedSession({
+        projectId: activeSession.project_id,
+        startTime: updated.start_time,
+        endTime: updated.end_time ?? Date.now(),
+        notes: notes,
+      });
+      setShowPrModal(true);
+    }
     setActiveSession(null);
     setNotes("");
     onSessionChange();
@@ -286,6 +305,26 @@ export default function Timer({ projects, onSessionChange }: TimerProps) {
             Crea al menos un proyecto y una cuenta de GitHub para empezar.
           </p>
         </div>
+      )}
+
+      {showPrModal && stoppedSession && (
+        <PrDescriptionModal
+          isOpen={showPrModal}
+          onClose={() => {
+            setShowPrModal(false);
+            setStoppedSession(null);
+          }}
+          accountId={
+            projects.find((p) => p.id === stoppedSession.projectId)
+              ?.account_id ?? 0
+          }
+          repo={
+            projects.find((p) => p.id === stoppedSession.projectId)?.repo ?? ""
+          }
+          startTime={stoppedSession.startTime}
+          endTime={stoppedSession.endTime}
+          notes={stoppedSession.notes}
+        />
       )}
     </div>
   );

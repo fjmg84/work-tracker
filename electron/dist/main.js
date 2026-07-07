@@ -10,6 +10,7 @@ const fs_1 = __importDefault(require("fs"));
 const connection_1 = __importDefault(require("./db/connection"));
 const migrations_1 = require("./db/migrations");
 const queries_1 = require("./db/queries");
+const ai_1 = require("./ai");
 const isDev = !electron_1.app.isPackaged;
 const PORT = 5170;
 (0, migrations_1.initializeSchema)(connection_1.default);
@@ -270,6 +271,150 @@ electron_1.ipcMain.handle("github:validateToken", async (_, { token }) => {
     catch (error) {
         return { valid: false, error: error.message };
     }
+});
+// ============================================================
+// IPC: GitHub - Commit Diffs
+// ============================================================
+async function fetchUserCommitsAndDiffs(accountId, repo, since, until) {
+    const token = safeGetToken(accountId);
+    if (!token)
+        throw new Error("No se encontró token para esta cuenta.");
+    const octokit = new rest_1.Octokit({ auth: token });
+    const account = queries_1.accountQueries.getById(connection_1.default, accountId);
+    if (!account)
+        throw new Error("Cuenta no encontrada.");
+    const [owner, repoName] = repo.split("/");
+    if (!owner || !repoName)
+        throw new Error("El formato del repo debe ser usuario/repo.");
+    const commits = [];
+    const diffs = [];
+    let repoCommits;
+    try {
+        repoCommits = await octokit.paginate(octokit.rest.repos.listCommits, {
+            owner,
+            repo: repoName,
+            author: account.username,
+            since: new Date(since).toISOString(),
+            until: new Date(until).toISOString(),
+            per_page: 100,
+        });
+    }
+    catch (error) {
+        throw new Error(`Error al obtener commits: ${error.message}`);
+    }
+    for (const c of repoCommits) {
+        commits.push({
+            sha: c.sha,
+            message: c.commit.message.split("\n")[0],
+            date: c.commit.committer?.date || "",
+        });
+        try {
+            const commitData = await octokit.rest.repos.getCommit({
+                owner,
+                repo: repoName,
+                ref: c.sha,
+            });
+            for (const file of commitData.data.files || []) {
+                diffs.push({
+                    filename: file.filename,
+                    patch: file.patch || "",
+                    additions: file.additions,
+                    deletions: file.deletions,
+                });
+            }
+        }
+        catch (error) {
+            console.error(`Error fetching diff for commit ${c.sha.substring(0, 7)}:`, error);
+        }
+    }
+    return { commits, diffs };
+}
+async function fetchPrCommitsAndDiffs(accountId, repo, prNumber) {
+    const token = safeGetToken(accountId);
+    if (!token)
+        throw new Error("No se encontró token para esta cuenta.");
+    const octokit = new rest_1.Octokit({ auth: token });
+    const account = queries_1.accountQueries.getById(connection_1.default, accountId);
+    if (!account)
+        throw new Error("Cuenta no encontrada.");
+    const [owner, repoName] = repo.split("/");
+    if (!owner || !repoName)
+        throw new Error("El formato del repo debe ser usuario/repo.");
+    const commits = [];
+    const diffs = [];
+    let prCommits;
+    try {
+        prCommits = await octokit.paginate(octokit.rest.pulls.listCommits, {
+            owner,
+            repo: repoName,
+            pull_number: prNumber,
+            per_page: 100,
+        });
+    }
+    catch (error) {
+        throw new Error(`Error al obtener commits del PR #${prNumber}: ${error.message}`);
+    }
+    for (const c of prCommits) {
+        if (c.author && c.author.login === account.username) {
+            commits.push({
+                sha: c.sha,
+                message: c.commit.message.split("\n")[0],
+                date: c.commit.committer?.date || "",
+            });
+        }
+    }
+    try {
+        const files = await octokit.paginate(octokit.rest.pulls.listFiles, {
+            owner,
+            repo: repoName,
+            pull_number: prNumber,
+            per_page: 100,
+        });
+        for (const file of files) {
+            diffs.push({
+                filename: file.filename,
+                patch: file.patch || "",
+                additions: file.additions,
+                deletions: file.deletions,
+            });
+        }
+    }
+    catch (error) {
+        console.error(`Error fetching diffs for PR #${prNumber}:`, error);
+    }
+    return { commits, diffs };
+}
+electron_1.ipcMain.handle("github:getCommitDiffs", async (_, { accountId, repo, since, until }) => {
+    return fetchUserCommitsAndDiffs(accountId, repo, since, until);
+});
+// ============================================================
+// IPC: AI
+// ============================================================
+electron_1.ipcMain.handle("ai:generatePrDescription", async (_, { accountId, repo, since, until, notes, language }) => {
+    const { commits, diffs } = await fetchUserCommitsAndDiffs(accountId, repo, since, until);
+    if (commits.length === 0) {
+        throw new Error("No se encontraron commits en el período seleccionado.");
+    }
+    const description = await (0, ai_1.generatePrDescription)({ commits, diffs, notes, language });
+    return { description };
+});
+electron_1.ipcMain.handle("ai:generatePrDescriptionFromPr", async (_, { accountId, repo, prNumber, notes, language }) => {
+    const { commits, diffs } = await fetchPrCommitsAndDiffs(accountId, repo, prNumber);
+    if (commits.length === 0) {
+        throw new Error("No se encontraron commits en el PR seleccionado.");
+    }
+    const description = await (0, ai_1.generatePrDescription)({ commits, diffs, notes, language });
+    return { description };
+});
+electron_1.ipcMain.handle("ai:getConfig", () => {
+    return (0, ai_1.loadAiConfig)();
+});
+electron_1.ipcMain.handle("ai:saveConfig", (_, config) => {
+    (0, ai_1.saveAiConfig)(config);
+    return true;
+});
+electron_1.ipcMain.handle("ai:testConnection", () => {
+    return (0, ai_1.testAiConnection)();
 });
 // ============================================================
 // IPC: App

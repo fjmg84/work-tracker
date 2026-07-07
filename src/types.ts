@@ -157,6 +157,43 @@ export interface ElectronSaveDialogResult {
 export interface Api {
   db: DbApi;
   github: GitHubApi;
+  ai: AiApi;
   app: AppApi;
   on: (channel: string, callback: (...args: any[]) => void) => () => void;
+}
+
+export type Language = "es" | "en";
+
+export interface AiProviderConfig {
+  apiKey: string;
+  model: string;
+}
+
+export interface PrDescriptionRequest {
+  accountId: number;
+  repo: string;
+  since: number;
+  until: number;
+  notes: string;
+  language: Language;
+}
+
+export interface PrDescriptionResponse {
+  description: string;
+}
+
+export interface AiApi {
+  generatePrDescription: (data: PrDescriptionRequest) => Promise<PrDescriptionResponse>;
+  generatePrDescriptionFromPr: (data: PrDescriptionFromPrRequest) => Promise<PrDescriptionResponse>;
+  getConfig: () => Promise<AiProviderConfig | null>;
+  saveConfig: (config: AiProviderConfig) => Promise<boolean>;
+  testConnection: () => Promise<{ success: boolean; error?: string }>;
+}
+
+export interface PrDescriptionFromPrRequest {
+  accountId: number;
+  repo: string;
+  prNumber: number;
+  notes: string;
+  language: Language;
 }
