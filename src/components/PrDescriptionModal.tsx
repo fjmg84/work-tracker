@@ -7,8 +7,7 @@ import {
   Loader2,
   AlertCircle,
   Settings,
-  Wifi,
-  WifiOff,
+  ExternalLink,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -21,6 +20,14 @@ interface PrDescriptionModalProps {
   endTime: number;
   notes: string;
 }
+
+const RECOMMENDED_MODELS = [
+  { id: "google/gemini-2.0-flash-001", label: "Gemini 2.0 Flash (barato)" },
+  { id: "anthropic/claude-3.5-sonnet", label: "Claude 3.5 Sonnet" },
+  { id: "openai/gpt-4o-mini", label: "GPT-4o Mini (barato)" },
+  { id: "openai/gpt-4o", label: "GPT-4o" },
+  { id: "meta-llama/llama-3.1-8b-instruct", label: "Llama 3.1 8B (gratis)" },
+];
 
 export default function PrDescriptionModal({
   isOpen,
@@ -39,11 +46,13 @@ export default function PrDescriptionModal({
   const [showSettings, setShowSettings] = useState<boolean>(false);
 
   const [aiConfig, setAiConfig] = useState<AiProviderConfig>({
-    baseUrl: "http://localhost:11434",
-    model: "llama3",
+    apiKey: "",
+    model: "google/gemini-2.0-flash-001",
   });
   const [testingConnection, setTestingConnection] = useState<boolean>(false);
-  const [connectionStatus, setConnectionStatus] = useState<"idle" | "success" | "error">("idle");
+  const [connectionStatus, setConnectionStatus] = useState<
+    "idle" | "success" | "error"
+  >("idle");
 
   useEffect(() => {
     if (isOpen) {
@@ -88,22 +97,25 @@ export default function PrDescriptionModal({
 
   const handleSaveConfig = async () => {
     await window.api.ai.saveConfig(aiConfig);
-    toast.success("Configuración de IA guardada");
+    toast.success("Configuración guardada");
     setShowSettings(false);
   };
 
   const handleTestConnection = async () => {
     setTestingConnection(true);
     setConnectionStatus("idle");
+    await handleSaveConfig();
     const result = await window.api.ai.testConnection();
     setConnectionStatus(result.success ? "success" : "error");
     setTestingConnection(false);
     if (!result.success) {
       toast.error(result.error || "Error de conexión");
     } else {
-      toast.success("Conexión exitosa");
+      toast.success("Conexión exitosa con OpenRouter");
     }
   };
+
+  const hasApiKey = !!aiConfig.apiKey;
 
   if (!isOpen) return null;
 
@@ -126,7 +138,7 @@ export default function PrDescriptionModal({
 
         {/* Body */}
         <div className="flex-1 overflow-y-auto p-4 space-y-4">
-          {/* Language selector */}
+          {/* Language selector + Settings toggle */}
           <div className="flex items-center gap-3">
             <label className="text-sm text-[var(--color-text-muted-light)] dark:text-[var(--color-text-muted-dark)]">
               Idioma:
@@ -156,65 +168,91 @@ export default function PrDescriptionModal({
             <div className="flex-1" />
             <button
               onClick={() => setShowSettings(!showSettings)}
-              className="btn btn-ghost p-2"
+              className="btn btn-ghost p-2 flex items-center gap-1 text-sm"
               aria-label="Configuración de IA"
             >
               <Settings className="w-4 h-4" />
+              {!hasApiKey && (
+                <span className="text-xs text-amber-600 dark:text-amber-400">
+                  Configurar
+                </span>
+              )}
             </button>
           </div>
 
-          {/* AI Settings (collapsible) */}
+          {/* OpenRouter Settings (collapsible) */}
           {showSettings && (
             <div className="card !mb-0 space-y-3">
-              <h4 className="text-sm font-medium text-[var(--color-text-light)] dark:text-[var(--color-text-dark)]">
-                Configuración de IA
-              </h4>
+              <div className="flex items-center justify-between">
+                <h4 className="text-sm font-medium text-[var(--color-text-light)] dark:text-[var(--color-text-dark)]">
+                  Configuración de OpenRouter
+                </h4>
+                <a
+                  href="https://openrouter.ai/keys"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-xs text-[var(--color-primary)] hover:underline flex items-center gap-1"
+                >
+                  Obtener API key
+                  <ExternalLink className="w-3 h-3" />
+                </a>
+              </div>
               <div>
                 <label className="block text-sm text-[var(--color-text-muted-light)] dark:text-[var(--color-text-muted-dark)] mb-1">
-                  URL del servidor
+                  API Key
                 </label>
                 <input
-                  type="text"
+                  type="password"
                   className="input"
-                  value={aiConfig.baseUrl}
+                  value={aiConfig.apiKey}
                   onChange={(e) =>
-                    setAiConfig({ ...aiConfig, baseUrl: e.target.value })
+                    setAiConfig({ ...aiConfig, apiKey: e.target.value })
                   }
-                  placeholder="http://localhost:11434"
+                  placeholder="sk-or-v1-..."
                 />
-                <p className="text-xs text-[var(--color-text-muted-light)] dark:text-[var(--color-text-muted-dark)] mt-1">
-                  Ollama: http://localhost:11434 · LM Studio: http://localhost:1234
-                </p>
               </div>
               <div>
                 <label className="block text-sm text-[var(--color-text-muted-light)] dark:text-[var(--color-text-muted-dark)] mb-1">
                   Modelo
                 </label>
-                <input
-                  type="text"
+                <select
                   className="input"
                   value={aiConfig.model}
                   onChange={(e) =>
                     setAiConfig({ ...aiConfig, model: e.target.value })
                   }
-                  placeholder="llama3"
-                />
+                >
+                  {RECOMMENDED_MODELS.map((m) => (
+                    <option key={m.id} value={m.id}>
+                      {m.label}
+                    </option>
+                  ))}
+                </select>
+                <p className="text-xs text-[var(--color-text-muted-light)] dark:text-[var(--color-text-muted-dark)] mt-1">
+                  O escribe un modelo personalizado de{" "}
+                  <a
+                    href="https://openrouter.ai/models"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-[var(--color-primary)] hover:underline"
+                  >
+                    openrouter.ai/models
+                  </a>
+                </p>
               </div>
               <div className="flex gap-2">
                 <button
                   onClick={handleTestConnection}
-                  disabled={testingConnection}
+                  disabled={testingConnection || !aiConfig.apiKey}
                   className="btn btn-secondary text-sm flex items-center gap-2"
                 >
                   {testingConnection ? (
                     <Loader2 className="w-3 h-3 animate-spin" />
                   ) : connectionStatus === "success" ? (
-                    <Wifi className="w-3 h-3 text-green-600" />
+                    <span className="w-2 h-2 rounded-full bg-green-500" />
                   ) : connectionStatus === "error" ? (
-                    <WifiOff className="w-3 h-3 text-red-600" />
-                  ) : (
-                    <Wifi className="w-3 h-3" />
-                  )}
+                    <span className="w-2 h-2 rounded-full bg-red-500" />
+                  ) : null}
                   Probar conexión
                 </button>
                 <button
@@ -231,6 +269,7 @@ export default function PrDescriptionModal({
           {!description && !loading && (
             <button
               onClick={handleGenerate}
+              disabled={!hasApiKey}
               className="btn btn-primary w-full py-3 text-base flex items-center justify-center gap-2"
             >
               Generar Descripción
@@ -242,7 +281,7 @@ export default function PrDescriptionModal({
             <div className="flex flex-col items-center justify-center py-8 gap-3">
               <Loader2 className="w-8 h-8 animate-spin text-[var(--color-primary)]" />
               <p className="text-sm text-[var(--color-text-muted-light)] dark:text-[var(--color-text-muted-dark)]">
-                Generando descripción...
+                Generando descripción con OpenRouter...
               </p>
             </div>
           )}

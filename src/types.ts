@@ -165,7 +165,7 @@ export interface Api {
 export type Language = "es" | "en";
 
 export interface AiProviderConfig {
-  baseUrl: string;
+  apiKey: string;
   model: string;
 }
 

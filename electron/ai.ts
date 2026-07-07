@@ -5,7 +5,7 @@ import path from "path";
 export type Language = "es" | "en";
 
 interface AiProviderConfig {
-  baseUrl: string;
+  apiKey: string;
   model: string;
 }
 
@@ -28,6 +28,8 @@ interface GeneratePrDescriptionParams {
   notes: string;
   language: Language;
 }
+
+const OPENROUTER_BASE_URL = "https://openrouter.ai/api/v1";
 
 const PROMPTS: Record<Language, string> = {
   es: `Eres un ingeniero de software experto. Genera una descripción detallada y profesional para un Pull Request, basándote en los commits y cambios del código proporcionados.
@@ -87,9 +89,9 @@ export async function generatePrDescription({
   language,
 }: GeneratePrDescriptionParams): Promise<string> {
   const config = loadAiConfig();
-  if (!config) {
+  if (!config || !config.apiKey) {
     throw new Error(
-      "No hay configuración de IA. Configura Ollama o LM Studio en ajustes.",
+      "No hay configuración de IA. Configura tu API key de OpenRouter en ajustes.",
     );
   }
 
@@ -114,9 +116,14 @@ export async function generatePrDescription({
     .filter(Boolean)
     .join("\n");
 
-  const response = await fetch(`${config.baseUrl}/v1/chat/completions`, {
+  const response = await fetch(`${OPENROUTER_BASE_URL}/chat/completions`, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${config.apiKey}`,
+      "HTTP-Referer": "https://work-tracker.app",
+      "X-Title": "Work Tracker",
+    },
     body: JSON.stringify({
       model: config.model,
       messages: [
@@ -131,7 +138,7 @@ export async function generatePrDescription({
   if (!response.ok) {
     const errorText = await response.text();
     throw new Error(
-      `Error del proveedor de IA (${response.status}): ${errorText}`,
+      `Error de OpenRouter (${response.status}): ${errorText}`,
     );
   }
 
@@ -144,14 +151,19 @@ export async function testAiConnection(): Promise<{
   error?: string;
 }> {
   const config = loadAiConfig();
-  if (!config) {
-    return { success: false, error: "No hay configuración de IA." };
+  if (!config || !config.apiKey) {
+    return { success: false, error: "No hay API key configurada." };
   }
 
   try {
-    const response = await fetch(`${config.baseUrl}/v1/chat/completions`, {
+    const response = await fetch(`${OPENROUTER_BASE_URL}/chat/completions`, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${config.apiKey}`,
+        "HTTP-Referer": "https://work-tracker.app",
+        "X-Title": "Work Tracker",
+      },
       body: JSON.stringify({
         model: config.model,
         messages: [{ role: "user", content: "Hello" }],
