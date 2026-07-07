@@ -6,6 +6,15 @@ import {
   GitHubActivityError,
 } from "../types";
 import MonthYearSelector from "./MonthYearSelector";
+import {
+  ChevronRight,
+  ChevronDown,
+  GitPullRequest,
+  GitCommit,
+  AlertCircle,
+  RefreshCw,
+  Activity as ActivityIcon,
+} from "lucide-react";
 
 interface ActivityProps {
   projects: Project[];
@@ -107,21 +116,40 @@ export default function Activity({ projects }: ActivityProps) {
         />
         <div className="flex-1">
           <button
-            className="btn btn-primary w-full"
+            className="btn btn-primary w-full flex items-center justify-center gap-2"
             onClick={load}
             disabled={loading || projects.length === 0}
           >
-            {loading ? "Cargando..." : "Consultar GitHub"}
+            {loading ? (
+              <>
+                <RefreshCw className="w-4 h-4 animate-spin" />
+                Cargando...
+              </>
+            ) : (
+              <>
+                <RefreshCw className="w-4 h-4" />
+                Consultar GitHub
+              </>
+            )}
           </button>
         </div>
       </div>
 
-      {error && <p className="text-sm text-[var(--color-danger)]">{error}</p>}
+      {error && (
+        <div className="flex items-center gap-2 text-sm text-[var(--color-danger)]">
+          <AlertCircle className="w-4 h-4" />
+          {error}
+        </div>
+      )}
 
       {errors.length > 0 && (
         <div className="mt-3">
           {errors.map((e, i) => (
-            <p key={i} className="text-sm text-[var(--color-danger)]">
+            <p
+              key={i}
+              className="text-sm text-[var(--color-danger)] flex items-center gap-2"
+            >
+              <AlertCircle className="w-4 h-4" />
               Error en {e.projectName}: {e.message}
             </p>
           ))}
@@ -131,17 +159,25 @@ export default function Activity({ projects }: ActivityProps) {
       {result && (
         <>
           {groupedByRepo.size === 0 ? (
-            <p className="text-[var(--color-text-muted-light)] dark:text-[var(--color-text-muted-dark)] text-center py-5 italic">
-              No se encontraron PRs.
-            </p>
+            <div className="text-center py-8">
+              <ActivityIcon className="w-12 h-12 mx-auto text-[var(--color-text-muted-light)] dark:text-[var(--color-text-muted-dark)] mb-3" />
+              <p className="text-[var(--color-text-muted-light)] dark:text-[var(--color-text-muted-dark)]">
+                No se encontraron PRs.
+              </p>
+            </div>
           ) : (
             Array.from(groupedByRepo.entries()).map(([repo, prs]) => (
               <div key={repo} className="mt-3">
                 <h4
-                  className="text-sm font-medium cursor-pointer select-none text-[var(--color-text-light)] dark:text-[var(--color-text-dark)] hover:text-[var(--color-primary)]"
+                  className="text-sm font-medium cursor-pointer select-none text-[var(--color-text-light)] dark:text-[var(--color-text-dark)] hover:text-[var(--color-primary)] flex items-center gap-2"
                   onClick={() => toggleRepo(repo)}
                 >
-                  {openRepos.has(repo) ? "▼" : "▶"} {repo}
+                  {openRepos.has(repo) ? (
+                    <ChevronDown className="w-4 h-4" />
+                  ) : (
+                    <ChevronRight className="w-4 h-4" />
+                  )}
+                  {repo}
                 </h4>
 
                 {openRepos.has(repo) && (
@@ -154,25 +190,44 @@ export default function Activity({ projects }: ActivityProps) {
                       prs.map((pr) => (
                         <div key={pr.id} className="mt-3">
                           <div className="py-2 border-b border-[var(--color-border-light)] dark:border-[var(--color-border-dark)] last:border-b-0">
-                            <a
-                              href={pr.html_url}
-                              target="_blank"
-                              rel="noreferrer"
-                              className="text-[var(--color-primary)] font-semibold no-underline hover:underline"
-                            >
-                              #{pr.number} {pr.title}
-                            </a>
-                            <div className="text-xs text-[var(--color-text-muted-light)] dark:text-[var(--color-text-muted-dark)] mt-0.5">
-                              {new Date(pr.created_at).toLocaleDateString(
-                                "es-ES",
-                              )}{" "}
-                              · {pr.projectName} · {pr.state}
+                            <div className="flex items-start gap-2">
+                              <GitPullRequest className="w-4 h-4 mt-0.5 text-[var(--color-primary)]" />
+                              <div className="flex-1">
+                                <a
+                                  href={pr.html_url}
+                                  target="_blank"
+                                  rel="noreferrer"
+                                  className="text-[var(--color-primary)] font-semibold no-underline hover:underline"
+                                >
+                                  #{pr.number} {pr.title}
+                                </a>
+                                <div className="text-xs text-[var(--color-text-muted-light)] dark:text-[var(--color-text-muted-dark)] mt-0.5 flex items-center gap-2">
+                                  {new Date(pr.created_at).toLocaleDateString(
+                                    "es-ES",
+                                  )}{" "}
+                                  · {pr.projectName}
+                                  <span
+                                    className={`badge ${
+                                      pr.state === "open"
+                                        ? "badge-green"
+                                        : pr.state === "closed"
+                                          ? "badge-gray"
+                                          : pr.state === "merged"
+                                            ? "badge-purple"
+                                            : "badge-blue"
+                                    }`}
+                                  >
+                                    {pr.state}
+                                  </span>
+                                </div>
+                              </div>
                             </div>
                           </div>
 
                           {pr.commits && pr.commits.length > 0 && (
                             <div className="mt-2 ml-5">
-                              <h6 className="text-sm font-medium text-[var(--color-text-light)] dark:text-[var(--color-text-dark)]">
+                              <h6 className="text-sm font-medium text-[var(--color-text-light)] dark:text-[var(--color-text-dark)] flex items-center gap-2">
+                                <GitCommit className="w-4 h-4" />
                                 Commits ({pr.commits.length})
                               </h6>
                               {pr.commits.map((c) => (
@@ -180,19 +235,24 @@ export default function Activity({ projects }: ActivityProps) {
                                   key={c.sha}
                                   className="py-2 border-b border-[var(--color-border-light)] dark:border-[var(--color-border-dark)] last:border-b-0"
                                 >
-                                  <a
-                                    href={c.html_url}
-                                    target="_blank"
-                                    rel="noreferrer"
-                                    className="text-[var(--color-primary)] font-semibold no-underline hover:underline"
-                                  >
-                                    {c.sha.substring(0, 7)}
-                                  </a>{" "}
-                                  {c.message}
-                                  <div className="text-xs text-[var(--color-text-muted-light)] dark:text-[var(--color-text-muted-dark)] mt-0.5">
-                                    {new Date(c.date).toLocaleDateString(
-                                      "es-ES",
-                                    )}
+                                  <div className="flex items-start gap-2">
+                                    <GitCommit className="w-4 h-4 mt-0.5 text-[var(--color-text-muted-light)] dark:text-[var(--color-text-muted-dark)]" />
+                                    <div className="flex-1">
+                                      <a
+                                        href={c.html_url}
+                                        target="_blank"
+                                        rel="noreferrer"
+                                        className="text-[var(--color-primary)] font-semibold no-underline hover:underline"
+                                      >
+                                        {c.sha.substring(0, 7)}
+                                      </a>{" "}
+                                      {c.message}
+                                      <div className="text-xs text-[var(--color-text-muted-light)] dark:text-[var(--color-text-muted-dark)] mt-0.5">
+                                        {new Date(c.date).toLocaleDateString(
+                                          "es-ES",
+                                        )}
+                                      </div>
+                                    </div>
                                   </div>
                                 </div>
                               ))}

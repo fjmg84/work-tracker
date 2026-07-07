@@ -1,5 +1,14 @@
 import { useState, useEffect, useRef } from "react";
 import { Project, Session } from "../types";
+import {
+  Play,
+  Square,
+  Pause,
+  RotateCcw,
+  Clock,
+  AlertCircle,
+} from "lucide-react";
+import { toast } from "sonner";
 
 interface TimerProps {
   projects: Project[];
@@ -51,8 +60,14 @@ export default function Timer({ projects, onSessionChange }: TimerProps) {
       setStaleSessions(sessions);
     };
 
-    const unsubAutoPause = window.api.on("session:auto-paused", handleAutoPause);
-    const unsubStale = window.api.on("sessions:stale-detected", handleStaleDetected);
+    const unsubAutoPause = window.api.on(
+      "session:auto-paused",
+      handleAutoPause,
+    );
+    const unsubStale = window.api.on(
+      "sessions:stale-detected",
+      handleStaleDetected,
+    );
 
     return () => {
       unsubAutoPause();
@@ -63,7 +78,9 @@ export default function Timer({ projects, onSessionChange }: TimerProps) {
   useEffect(() => {
     if (activeSession && !isPaused) {
       intervalRef.current = setInterval(() => {
-        setElapsed(Date.now() - activeSession.start_time - activeSession.total_paused_ms);
+        setElapsed(
+          Date.now() - activeSession.start_time - activeSession.total_paused_ms,
+        );
       }, 1000);
       return () => {
         if (intervalRef.current) clearInterval(intervalRef.current);
@@ -71,7 +88,11 @@ export default function Timer({ projects, onSessionChange }: TimerProps) {
     } else {
       if (intervalRef.current) clearInterval(intervalRef.current);
       if (activeSession && isPaused) {
-        setElapsed(activeSession.paused_at! - activeSession.start_time - activeSession.total_paused_ms);
+        setElapsed(
+          activeSession.paused_at! -
+            activeSession.start_time -
+            activeSession.total_paused_ms,
+        );
       } else {
         setElapsed(0);
       }
@@ -84,7 +105,7 @@ export default function Timer({ projects, onSessionChange }: TimerProps) {
 
     const existing = await window.api.db.getActiveSession();
     if (existing) {
-      alert("Ya hay una sesión activa. Deténla antes de iniciar otra.");
+      toast.error("Ya hay una sesión activa. Deténla antes de iniciar otra.");
       return;
     }
 
@@ -108,7 +129,7 @@ export default function Timer({ projects, onSessionChange }: TimerProps) {
     onSessionChange();
     const activeMs =
       (updated.end_time ?? 0) - updated.start_time - updated.total_paused_ms;
-    alert(`Sesión guardada: ${formatElapsed(activeMs)}`);
+    toast.success(`Sesión guardada: ${formatElapsed(activeMs)}`);
   };
 
   const pause = async () => {
@@ -128,7 +149,7 @@ export default function Timer({ projects, onSessionChange }: TimerProps) {
     await window.api.db.closeStaleSessions({ ids });
     setStaleSessions([]);
     onSessionChange();
-    alert(`${ids.length} sesiones antiguas cerradas.`);
+    toast.success(`${ids.length} sesiones antiguas cerradas.`);
   };
 
   if (loading) return <div className="card">Cargando...</div>;
@@ -141,10 +162,13 @@ export default function Timer({ projects, onSessionChange }: TimerProps) {
 
       {staleSessions.length > 0 && (
         <div className="bg-amber-100 dark:bg-amber-900/30 border border-amber-400 dark:border-amber-600 rounded-lg p-3 mb-4 flex justify-between items-center">
-          <p className="text-amber-800 dark:text-amber-200 text-sm">
-            Se detectaron {staleSessions.length} sesiones activas de hace más
-            de 24 horas.
-          </p>
+          <div className="flex items-center gap-2">
+            <AlertCircle className="w-4 h-4 text-amber-600 dark:text-amber-400" />
+            <p className="text-amber-800 dark:text-amber-200 text-sm">
+              Se detectaron {staleSessions.length} sesiones activas de hace más
+              de 24 horas.
+            </p>
+          </div>
           <button
             className="btn btn-primary text-sm py-2 px-4"
             onClick={closeStaleSessions}
@@ -191,10 +215,15 @@ export default function Timer({ projects, onSessionChange }: TimerProps) {
         </div>
       </div>
 
-      <div className="text-5xl font-bold font-variant-numeric tabular-nums text-center my-4 text-[var(--color-text-light)] dark:text-[var(--color-text-dark)]">
-        {formatElapsed(elapsed)}
+      <div
+        className={`text-6xl font-bold font-variant-numeric tabular-nums text-center my-6 text-[var(--color-text-light)] dark:text-[var(--color-text-dark)] ${activeSession && !isPaused ? "animate-pulse-timer" : ""}`}
+      >
+        <div className="flex items-center justify-center gap-3">
+          <Clock className="w-8 h-8 text-[var(--color-primary)]" />
+          {formatElapsed(elapsed)}
+        </div>
         {isPaused && (
-          <span className="ml-2 text-sm font-semibold bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-300 px-2 py-1 rounded-full">
+          <span className="mt-2 inline-block text-sm font-semibold bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-300 px-3 py-1 rounded-full">
             Pausado
           </span>
         )}
@@ -202,26 +231,36 @@ export default function Timer({ projects, onSessionChange }: TimerProps) {
 
       <div className="flex gap-3 justify-center">
         <button
-          className="btn btn-primary min-w-[100px] text-base py-3 px-5"
+          className="btn btn-primary min-w-[120px] text-base py-3 px-5 flex items-center justify-center gap-2"
           onClick={start}
           disabled={!selectedProjectId || !!activeSession}
         >
-          Start
+          <Play className="w-4 h-4" />
+          Iniciar
         </button>
         <button
-          className="btn btn-danger min-w-[100px] text-base py-3 px-5"
+          className="btn btn-danger min-w-[120px] text-base py-3 px-5 flex items-center justify-center gap-2"
           onClick={stop}
           disabled={!activeSession}
         >
-          Stop
+          <Square className="w-4 h-4" />
+          Detener
         </button>
         {activeSession && !isPaused && (
-          <button className="btn btn-secondary min-w-[100px] text-base py-3 px-5" onClick={pause}>
+          <button
+            className="btn btn-secondary min-w-[120px] text-base py-3 px-5 flex items-center justify-center gap-2"
+            onClick={pause}
+          >
+            <Pause className="w-4 h-4" />
             Pausar
           </button>
         )}
         {activeSession && isPaused && (
-          <button className="btn btn-primary min-w-[100px] text-base py-3 px-5" onClick={resume}>
+          <button
+            className="btn btn-primary min-w-[120px] text-base py-3 px-5 flex items-center justify-center gap-2"
+            onClick={resume}
+          >
+            <RotateCcw className="w-4 h-4" />
             Reanudar
           </button>
         )}
@@ -234,17 +273,19 @@ export default function Timer({ projects, onSessionChange }: TimerProps) {
           {activeSession.total_paused_ms > 0 && (
             <span>
               {" "}
-              · Pausado{" "}
-              {formatElapsed(activeSession.total_paused_ms)} en total
+              · Pausado {formatElapsed(activeSession.total_paused_ms)} en total
             </span>
           )}
         </p>
       )}
 
       {!projects.length && (
-        <p className="text-[var(--color-text-muted-light)] dark:text-[var(--color-text-muted-dark)] text-center py-5 italic mt-3">
-          Crea al menos un proyecto y una cuenta de GitHub para empezar.
-        </p>
+        <div className="text-center py-8 mt-3">
+          <Clock className="w-12 h-12 mx-auto text-[var(--color-text-muted-light)] dark:text-[var(--color-text-muted-dark)] mb-3" />
+          <p className="text-[var(--color-text-muted-light)] dark:text-[var(--color-text-muted-dark)]">
+            Crea al menos un proyecto y una cuenta de GitHub para empezar.
+          </p>
+        </div>
       )}
     </div>
   );

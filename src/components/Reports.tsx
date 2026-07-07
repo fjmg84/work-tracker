@@ -8,6 +8,15 @@ import {
   GitHubActivityError,
 } from "../types";
 import MonthYearSelector from "./MonthYearSelector";
+import {
+  Clock,
+  Timer,
+  GitPullRequest,
+  GitCommit,
+  Download,
+  FileText,
+} from "lucide-react";
+import { toast } from "sonner";
 
 interface ReportsProps {
   projects: Project[];
@@ -29,7 +38,6 @@ export default function Reports({ projects }: ReportsProps) {
     prs: PullRequest[];
     commits: Commit[];
   }>({ prs: [], commits: [] });
-  const [exported, setExported] = useState<boolean>(false);
   const [summary, setSummary] = useState<Summary | null>(null);
 
   useEffect(() => {
@@ -123,8 +131,7 @@ export default function Reports({ projects }: ReportsProps) {
     if (result.canceled) return;
 
     await window.api.app.exportCsv({ filePath: result.filePath!, content });
-    setExported(true);
-    setTimeout(() => setExported(false), 3000);
+    toast.success("CSV exportado correctamente");
   };
 
   return (
@@ -158,33 +165,30 @@ export default function Reports({ projects }: ReportsProps) {
         </div>
         <div className="flex-1">
           <button
-            className="btn btn-primary w-full"
+            className="btn btn-primary w-full flex items-center justify-center gap-2"
             onClick={exportCsv}
             disabled={projects.length === 0}
           >
+            <Download className="w-4 h-4" />
             Exportar CSV
           </button>
         </div>
       </div>
 
-      {exported && (
-        <p className="text-sm text-[var(--color-success)]">
-          CSV exportado correctamente.
-        </p>
-      )}
-
       {summary && (
         <div className="grid grid-cols-[repeat(auto-fit,minmax(180px,1fr))] gap-3 mb-4">
           <div className="bg-[var(--color-surface-muted-light)] dark:bg-[var(--color-surface-muted-dark)] border border-[var(--color-border-light)] dark:border-[var(--color-border-dark)] rounded-md p-3 text-center">
+            <Clock className="w-6 h-6 mx-auto mb-2 text-[var(--color-primary)]" />
             <div className="text-2xl font-bold text-[var(--color-primary)]">
               {Math.floor(summary.totalMinutes / 60)}h{" "}
               {summary.totalMinutes % 60}m
             </div>
             <div className="text-xs text-[var(--color-text-muted-light)] dark:text-[var(--color-text-muted-dark)] uppercase">
-              Horas trabajadas en el mes
+              Horas trabajadas
             </div>
           </div>
           <div className="bg-[var(--color-surface-muted-light)] dark:bg-[var(--color-surface-muted-dark)] border border-[var(--color-border-light)] dark:border-[var(--color-border-dark)] rounded-md p-3 text-center">
+            <Timer className="w-6 h-6 mx-auto mb-2 text-[var(--color-primary)]" />
             <div className="text-2xl font-bold text-[var(--color-primary)]">
               {summary.sessions}
             </div>
@@ -193,6 +197,7 @@ export default function Reports({ projects }: ReportsProps) {
             </div>
           </div>
           <div className="bg-[var(--color-surface-muted-light)] dark:bg-[var(--color-surface-muted-dark)] border border-[var(--color-border-light)] dark:border-[var(--color-border-dark)] rounded-md p-3 text-center">
+            <GitPullRequest className="w-6 h-6 mx-auto mb-2 text-[var(--color-primary)]" />
             <div className="text-2xl font-bold text-[var(--color-primary)]">
               {summary.prs}
             </div>
@@ -201,6 +206,7 @@ export default function Reports({ projects }: ReportsProps) {
             </div>
           </div>
           <div className="bg-[var(--color-surface-muted-light)] dark:bg-[var(--color-surface-muted-dark)] border border-[var(--color-border-light)] dark:border-[var(--color-border-dark)] rounded-md p-3 text-center">
+            <GitCommit className="w-6 h-6 mx-auto mb-2 text-[var(--color-primary)]" />
             <div className="text-2xl font-bold text-[var(--color-primary)]">
               {summary.commits}
             </div>
@@ -212,13 +218,17 @@ export default function Reports({ projects }: ReportsProps) {
       )}
 
       <div className="mt-3">
-        <h4 className="text-sm font-medium text-[var(--color-text-light)] dark:text-[var(--color-text-dark)] mb-2">
+        <h4 className="text-sm font-medium text-[var(--color-text-light)] dark:text-[var(--color-text-dark)] mb-2 flex items-center gap-2">
+          <FileText className="w-4 h-4" />
           Sesiones del mes
         </h4>
         <ul className="list-none mt-3">
           {sessions.filter((s) => s.end_time).length === 0 && (
-            <li className="text-[var(--color-text-muted-light)] dark:text-[var(--color-text-muted-dark)] text-center py-5 italic">
-              No hay sesiones registradas en este mes.
+            <li className="text-center py-8">
+              <FileText className="w-12 h-12 mx-auto text-[var(--color-text-muted-light)] dark:text-[var(--color-text-muted-dark)] mb-3" />
+              <p className="text-[var(--color-text-muted-light)] dark:text-[var(--color-text-muted-dark)]">
+                No hay sesiones registradas en este mes.
+              </p>
             </li>
           )}
           {Object.entries(

@@ -1,5 +1,7 @@
 import { useState } from "react";
 import { Project, Account, ProjectInput } from "../types";
+import { Pencil, Trash2, Plus, FolderGit2 } from "lucide-react";
+import { toast } from "sonner";
 
 interface ProjectsProps {
   projects: Project[];
@@ -59,10 +61,20 @@ export default function Projects({
   };
 
   const remove = async (id: number) => {
-    if (!confirm("¿Eliminar este proyecto? Se borrarán también sus sesiones."))
-      return;
-    await window.api.db.deleteProject(id);
-    onChange();
+    toast("¿Eliminar este proyecto? Se borrarán también sus sesiones.", {
+      action: {
+        label: "Eliminar",
+        onClick: async () => {
+          await window.api.db.deleteProject(id);
+          onChange();
+          toast.success("Proyecto eliminado");
+        },
+      },
+      cancel: {
+        label: "Cancelar",
+        onClick: () => {},
+      },
+    });
   };
 
   return (
@@ -73,14 +85,17 @@ export default function Projects({
 
       <ul className="list-none mb-3">
         {projects.length === 0 && (
-          <li className="text-[var(--color-text-muted-light)] dark:text-[var(--color-text-muted-dark)] text-center py-5 italic">
-            No hay proyectos registrados.
+          <li className="text-center py-8">
+            <FolderGit2 className="w-12 h-12 mx-auto text-[var(--color-text-muted-light)] dark:text-[var(--color-text-muted-dark)] mb-3" />
+            <p className="text-[var(--color-text-muted-light)] dark:text-[var(--color-text-muted-dark)]">
+              No hay proyectos registrados.
+            </p>
           </li>
         )}
         {projects.map((p) => (
           <li
             key={p.id}
-            className="flex justify-between items-center py-2.5 border-b border-[var(--color-border-light)] dark:border-[var(--color-border-dark)] last:border-b-0"
+            className="flex justify-between items-center py-3 border-b border-[var(--color-border-light)] dark:border-[var(--color-border-dark)] last:border-b-0 hover:bg-[var(--color-surface-muted-light)] dark:hover:bg-[var(--color-surface-muted-dark)] transition-colors rounded-md px-2 -mx-2"
           >
             <div>
               <strong className="text-[var(--color-text-light)] dark:text-[var(--color-text-dark)]">
@@ -92,20 +107,31 @@ export default function Projects({
             </div>
             <div className="flex gap-2">
               <button
-                className="btn btn-secondary"
+                className="btn btn-secondary flex items-center gap-2"
                 onClick={() => startEdit(p)}
+                aria-label="Editar proyecto"
               >
-                Editar
+                <Pencil className="w-4 h-4" />
+                <span className="hidden sm:inline">Editar</span>
               </button>
-              <button className="btn btn-danger" onClick={() => remove(p.id)}>
-                Eliminar
+              <button
+                className="btn btn-danger flex items-center gap-2"
+                onClick={() => remove(p.id)}
+                aria-label="Eliminar proyecto"
+              >
+                <Trash2 className="w-4 h-4" />
+                <span className="hidden sm:inline">Eliminar</span>
               </button>
             </div>
           </li>
         ))}
       </ul>
 
-      <button className="btn btn-primary" onClick={startNew}>
+      <button
+        className="btn btn-primary flex items-center justify-center gap-2"
+        onClick={startNew}
+      >
+        <Plus className="w-4 h-4" />
         Agregar proyecto
       </button>
 
