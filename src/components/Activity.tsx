@@ -6,6 +6,7 @@ import {
   GitHubActivityError,
 } from "../types";
 import MonthYearSelector from "./MonthYearSelector";
+import PrDescriptionModal from "./PrDescriptionModal";
 import {
   ChevronRight,
   ChevronDown,
@@ -14,6 +15,7 @@ import {
   AlertCircle,
   RefreshCw,
   Activity as ActivityIcon,
+  Sparkles,
 } from "lucide-react";
 
 interface ActivityProps {
@@ -27,6 +29,13 @@ export default function Activity({ projects }: ActivityProps) {
   const [result, setResult] = useState<GitHubActivity | null>(null);
   const [error, setError] = useState<string>("");
   const [openRepos, setOpenRepos] = useState<Set<string>>(new Set());
+  const [showPrModal, setShowPrModal] = useState<boolean>(false);
+  const [selectedPr, setSelectedPr] = useState<{
+    accountId: number;
+    repo: string;
+    since: number;
+    until: number;
+  } | null>(null);
 
   const toggleRepo = (repo: string) => {
     const newOpenRepos = new Set(openRepos);
@@ -36,6 +45,26 @@ export default function Activity({ projects }: ActivityProps) {
       newOpenRepos.add(repo);
     }
     setOpenRepos(newOpenRepos);
+  };
+
+  const openPrDescription = (pr: PullRequest) => {
+    const project = projects.find((p) => p.repo === pr.html_url.split("/").slice(3, 5).join("/"));
+    if (!project) return;
+
+    const commits = pr.commits || [];
+    if (commits.length === 0) return;
+
+    const dates = commits.map((c) => new Date(c.date).getTime());
+    const since = Math.min(...dates);
+    const until = Math.max(...dates);
+
+    setSelectedPr({
+      accountId: project.account_id,
+      repo: project.repo,
+      since,
+      until,
+    });
+    setShowPrModal(true);
   };
 
   const load = async () => {
@@ -221,6 +250,16 @@ export default function Activity({ projects }: ActivityProps) {
                                   </span>
                                 </div>
                               </div>
+                              {pr.commits && pr.commits.length > 0 && (
+                                <button
+                                  onClick={() => openPrDescription(pr)}
+                                  className="btn btn-secondary text-xs flex items-center gap-1 mt-2"
+                                  title="Generar descripción del PR con IA"
+                                >
+                                  <Sparkles className="w-3 h-3" />
+                                  Generar descripción
+                                </button>
+                              )}
                             </div>
                           </div>
 
@@ -267,6 +306,21 @@ export default function Activity({ projects }: ActivityProps) {
             ))
           )}
         </>
+      )}
+
+      {showPrModal && selectedPr && (
+        <PrDescriptionModal
+          isOpen={showPrModal}
+          onClose={() => {
+            setShowPrModal(false);
+            setSelectedPr(null);
+          }}
+          accountId={selectedPr.accountId}
+          repo={selectedPr.repo}
+          startTime={selectedPr.since}
+          endTime={selectedPr.until}
+          notes=""
+        />
       )}
     </div>
   );
