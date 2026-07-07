@@ -23,7 +23,7 @@ export default function Timer({ projects, onSessionChange }: TimerProps) {
   const intervalRef = useRef<NodeJS.Timeout | null>(null);
   const [staleSessions, setStaleSessions] = useState<Session[]>([]);
 
-  const isPaused = activeSession?.paused_at !== null;
+  const isPaused = activeSession !== null && activeSession.paused_at !== null;
 
   useEffect(() => {
     async function load() {
@@ -46,27 +46,16 @@ export default function Timer({ projects, onSessionChange }: TimerProps) {
       });
     };
 
-    // Listen for resume from suspend
-    const handleResumeFromSuspend = () => {
-      window.api.db.getActiveSession().then((session) => {
-        if (session) {
-          setActiveSession(session);
-        }
-      });
-    };
-
     // Listen for stale sessions from main process
     const handleStaleDetected = (sessions: Session[]) => {
       setStaleSessions(sessions);
     };
 
     const unsubAutoPause = window.api.on("session:auto-paused", handleAutoPause);
-    const unsubResume = window.api.on("session:resumed-from-suspend", handleResumeFromSuspend);
     const unsubStale = window.api.on("sessions:stale-detected", handleStaleDetected);
 
     return () => {
       unsubAutoPause();
-      unsubResume();
       unsubStale();
     };
   }, []);

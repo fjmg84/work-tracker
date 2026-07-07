@@ -66,17 +66,12 @@ function createWindow() {
 // ============================================================
 electron_1.app.whenReady().then(() => {
     createWindow();
-    // Power monitor: track suspend/resume
-    let suspendTimestamp = null;
+    // Power monitor: auto-pause active session on suspend
     electron_1.powerMonitor.on("suspend", () => {
-        suspendTimestamp = Date.now();
-    });
-    electron_1.powerMonitor.on("resume", () => {
-        if (suspendTimestamp) {
-            const suspendDuration = Date.now() - suspendTimestamp;
-            queries_1.sessionQueries.adjustForSuspend(connection_1.default, { suspendDuration });
-            suspendTimestamp = null;
-            mainWindow?.webContents.send("session:resumed-from-suspend");
+        const session = queries_1.sessionQueries.getActiveUnpaused(connection_1.default);
+        if (session) {
+            queries_1.sessionQueries.markIdlePaused(connection_1.default, { id: session.id, paused_at: Date.now() });
+            mainWindow?.webContents.send("session:auto-paused");
         }
     });
     // Idle detection: auto-pause after 10 minutes of inactivity
