@@ -8,25 +8,13 @@ import {
   GitHubActivityError,
 } from "../types";
 import MonthYearSelector from "./MonthYearSelector";
-import {
-  Clock,
-  Timer,
-  GitPullRequest,
-  GitCommit,
-  Download,
-  FileText,
-} from "lucide-react";
+import { Download, FileText } from "lucide-react";
 import { toast } from "sonner";
+import Summary from "./Summary";
+import { SummaryType } from "@/types/reports";
 
 interface ReportsProps {
   projects: Project[];
-}
-
-interface Summary {
-  totalMinutes: number;
-  sessions: number;
-  prs: number;
-  commits: number;
 }
 
 export default function Reports({ projects }: ReportsProps) {
@@ -38,7 +26,7 @@ export default function Reports({ projects }: ReportsProps) {
     prs: PullRequest[];
     commits: Commit[];
   }>({ prs: [], commits: [] });
-  const [summary, setSummary] = useState<Summary | null>(null);
+  const [summary, setSummary] = useState<SummaryType | null>(null);
 
   useEffect(() => {
     loadData();
@@ -188,47 +176,7 @@ export default function Reports({ projects }: ReportsProps) {
         </div>
       </div>
 
-      {summary && (
-        <div className="grid grid-cols-[repeat(auto-fit,minmax(180px,1fr))] gap-3 mb-4">
-          <div className="bg-[var(--color-surface-muted-light)] dark:bg-[var(--color-surface-muted-dark)] border border-[var(--color-border-light)] dark:border-[var(--color-border-dark)] rounded-md p-3 text-center">
-            <Clock className="w-6 h-6 mx-auto mb-2 text-[var(--color-primary)]" />
-            <div className="text-2xl font-bold text-[var(--color-primary)]">
-              {Math.floor(summary.totalMinutes / 60)}h{" "}
-              {summary.totalMinutes % 60}m
-            </div>
-            <div className="text-xs text-[var(--color-text-muted-light)] dark:text-[var(--color-text-muted-dark)] uppercase">
-              Horas trabajadas
-            </div>
-          </div>
-          <div className="bg-[var(--color-surface-muted-light)] dark:bg-[var(--color-surface-muted-dark)] border border-[var(--color-border-light)] dark:border-[var(--color-border-dark)] rounded-md p-3 text-center">
-            <Timer className="w-6 h-6 mx-auto mb-2 text-[var(--color-primary)]" />
-            <div className="text-2xl font-bold text-[var(--color-primary)]">
-              {summary.sessions}
-            </div>
-            <div className="text-xs text-[var(--color-text-muted-light)] dark:text-[var(--color-text-muted-dark)] uppercase">
-              Sesiones
-            </div>
-          </div>
-          <div className="bg-[var(--color-surface-muted-light)] dark:bg-[var(--color-surface-muted-dark)] border border-[var(--color-border-light)] dark:border-[var(--color-border-dark)] rounded-md p-3 text-center">
-            <GitPullRequest className="w-6 h-6 mx-auto mb-2 text-[var(--color-primary)]" />
-            <div className="text-2xl font-bold text-[var(--color-primary)]">
-              {summary.prs}
-            </div>
-            <div className="text-xs text-[var(--color-text-muted-light)] dark:text-[var(--color-text-muted-dark)] uppercase">
-              PRs
-            </div>
-          </div>
-          <div className="bg-[var(--color-surface-muted-light)] dark:bg-[var(--color-surface-muted-dark)] border border-[var(--color-border-light)] dark:border-[var(--color-border-dark)] rounded-md p-3 text-center">
-            <GitCommit className="w-6 h-6 mx-auto mb-2 text-[var(--color-primary)]" />
-            <div className="text-2xl font-bold text-[var(--color-primary)]">
-              {summary.commits}
-            </div>
-            <div className="text-xs text-[var(--color-text-muted-light)] dark:text-[var(--color-text-muted-dark)] uppercase">
-              Commits
-            </div>
-          </div>
-        </div>
-      )}
+      <Summary summary={summary} />
 
       <div className="mt-3">
         <h4 className="text-sm font-medium text-[var(--color-text-light)] dark:text-[var(--color-text-dark)] mb-2 flex items-center gap-2">
