@@ -134,6 +134,19 @@ export default function Reports({ projects }: ReportsProps) {
     toast.success("CSV exportado correctamente");
   };
 
+  const sessionsFiltered = sessions.filter((s) => s.end_time);
+  const sessionsByWeek: Record<string, Record<string, Session[]>> = {};
+  for (const s of sessionsFiltered) {
+    const d = new Date(s.start_time);
+    const dayOfWeek = d.getDay() === 0 ? 6 : d.getDay() - 1;
+    const monday = new Date(d);
+    monday.setDate(d.getDate() - dayOfWeek);
+    const weekKey = `${monday.getFullYear()}-${String(monday.getMonth() + 1).padStart(2, "0")}-${String(monday.getDate()).padStart(2, "0")}`;
+    const dayKey = `Día ${d.getDate()}`;
+    (sessionsByWeek[weekKey] ??= {})[dayKey] ??= [];
+    sessionsByWeek[weekKey][dayKey].push(s);
+  }
+
   return (
     <div className="card">
       <h3 className="text-base font-medium text-[var(--color-text-light)] dark:text-[var(--color-text-dark)] mb-3">
@@ -231,55 +244,66 @@ export default function Reports({ projects }: ReportsProps) {
               </p>
             </li>
           )}
-          {Object.entries(
-            sessions
-              .filter((s) => s.end_time)
-              .reduce<Record<string, Session[]>>((groups, s) => {
-                const dayKey =
-                  "Día " + new Date(s.start_time).getDate().toString();
-                (groups[dayKey] ??= []).push(s);
-                return groups;
-              }, {}),
-          ).map(([dayKey, daySessions]) => {
-            const dayMinutes = daySessions.reduce(
-              (acc, s) =>
-                acc + Math.round(((s.end_time ?? 0) - s.start_time) / 60000),
-              0,
+          {Object.entries(sessionsByWeek).map(([weekKey, days]) => {
+            let weekMinutes = 0;
+            const dayEntries = Object.entries(days).map(
+              ([dayKey, daySessions]) => {
+                const dayMinutes = daySessions.reduce(
+                  (acc, s) =>
+                    acc +
+                    Math.round(((s.end_time ?? 0) - s.start_time) / 60000),
+                  0,
+                );
+                weekMinutes += dayMinutes;
+                return { dayKey, daySessions, dayMinutes };
+              },
             );
             return (
-              <li key={dayKey} className="mb-4">
-                <div className="text-sm font-medium text-[var(--color-text-light)] dark:text-[var(--color-text-dark)] mb-2">
-                  {dayKey}
-                </div>
+              <li key={weekKey} className="mb-4">
                 <ul className="list-none">
-                  {daySessions.map((s) => {
-                    const project = projects.find(
-                      (p) => p.id === s.project_id,
-                    ) || {
-                      name: "-",
-                      account_label: "-",
-                    };
-                    const minutes = Math.round(
-                      ((s.end_time ?? 0) - s.start_time) / 60000,
-                    );
-                    return (
-                      <li
-                        key={s.id}
-                        className="flex justify-between py-2 border-b border-[var(--color-border-light)] dark:border-[var(--color-border-dark)] last:border-b-0"
-                      >
-                        <span className="text-[var(--color-text-light)] dark:text-[var(--color-text-dark)]">
-                          {project.name}
-                        </span>
-                        <span className="text-[var(--color-text-light)] dark:text-[var(--color-text-dark)]">
-                          {Math.floor(minutes / 60)}h {minutes % 60}m
-                        </span>
-                      </li>
-                    );
-                  })}
-                  <li className="flex justify-between py-2 border-b border-[var(--color-border-light)] dark:border-[var(--color-border-dark)] last:border-b-0 font-medium text-[var(--color-primary)]">
-                    <span>Total del día</span>
+                  {dayEntries.map(({ dayKey, daySessions, dayMinutes }) => (
+                    <li key={dayKey} className="mb-4">
+                      <div className="text-sm font-medium text-[var(--color-text-light)] dark:text-[var(--color-text-dark)] mb-2">
+                        {dayKey}
+                      </div>
+                      <ul className="list-none">
+                        {daySessions.map((s) => {
+                          const project = projects.find(
+                            (p) => p.id === s.project_id,
+                          ) || {
+                            name: "-",
+                            account_label: "-",
+                          };
+                          const minutes = Math.round(
+                            ((s.end_time ?? 0) - s.start_time) / 60000,
+                          );
+                          return (
+                            <li
+                              key={s.id}
+                              className="flex justify-between py-2 border-b border-[var(--color-border-light)] dark:border-[var(--color-border-dark)] last:border-b-0"
+                            >
+                              <span className="text-[var(--color-text-light)] dark:text-[var(--color-text-dark)]">
+                                {project.name}
+                              </span>
+                              <span className="text-[var(--color-text-light)] dark:text-[var(--color-text-dark)]">
+                                {Math.floor(minutes / 60)}h {minutes % 60}m
+                              </span>
+                            </li>
+                          );
+                        })}
+                        <li className="flex justify-between py-2 border-b border-[var(--color-border-light)] dark:border-[var(--color-border-dark)] last:border-b-0 font-medium text-[var(--color-primary)]">
+                          <span>Total del día</span>
+                          <span>
+                            {Math.floor(dayMinutes / 60)}h {dayMinutes % 60}m
+                          </span>
+                        </li>
+                      </ul>
+                    </li>
+                  ))}
+                  <li className="flex justify-between py-2 border-b-2 border-[var(--color-primary)] font-bold text-[var(--color-primary)]">
+                    <span>Total de la semana</span>
                     <span>
-                      {Math.floor(dayMinutes / 60)}h {dayMinutes % 60}m
+                      {Math.floor(weekMinutes / 60)}h {weekMinutes % 60}m
                     </span>
                   </li>
                 </ul>
