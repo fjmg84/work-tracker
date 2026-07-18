@@ -321,8 +321,6 @@ export default function Timer({ projects, onSessionChange }: TimerProps) {
           repo={
             projects.find((p) => p.id === stoppedSession.projectId)?.repo ?? ""
           }
-          startTime={stoppedSession.startTime}
-          endTime={stoppedSession.endTime}
           notes={stoppedSession.notes}
         />
       )}

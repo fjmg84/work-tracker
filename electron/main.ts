@@ -438,6 +438,85 @@ async function fetchPrCommitsAndDiffs(accountId: number, repo: string, prNumber:
   return { commits, diffs };
 }
 
+async function getRepoDefaultBranch(accountId: number, repo: string) {
+  const token = safeGetToken(accountId);
+  if (!token) throw new Error("No se encontró token para esta cuenta.");
+  const octokit = new Octokit({ auth: token });
+  const [owner, repoName] = repo.split("/");
+  if (!owner || !repoName) throw new Error("El formato del repo debe ser usuario/repo.");
+  const { data } = await octokit.rest.repos.get({ owner, repo: repoName });
+  return data.default_branch;
+}
+
+async function fetchBranches(accountId: number, repo: string) {
+  const token = safeGetToken(accountId);
+  if (!token) throw new Error("No se encontró token para esta cuenta.");
+  const octokit = new Octokit({ auth: token });
+  const [owner, repoName] = repo.split("/");
+  if (!owner || !repoName) throw new Error("El formato del repo debe ser usuario/repo.");
+
+  const defaultBranch = await getRepoDefaultBranch(accountId, repo);
+  const { data: branches } = await octokit.rest.repos.listBranches({
+    owner,
+    repo: repoName,
+    per_page: 100,
+  });
+
+  return branches
+    .filter((b) => b.name !== defaultBranch)
+    .map((b) => ({
+      name: b.name,
+      lastCommitDate: (b.commit as any).commit?.committer?.date || "",
+    }))
+    .sort((a, b) => b.lastCommitDate.localeCompare(a.lastCommitDate));
+}
+
+async function fetchBranchChanges(accountId: number, repo: string, branchName: string) {
+  const token = safeGetToken(accountId);
+  if (!token) throw new Error("No se encontró token para esta cuenta.");
+
+  const octokit = new Octokit({ auth: token });
+  const account = accountQueries.getById(db, accountId);
+  if (!account) throw new Error("Cuenta no encontrada.");
+
+  const [owner, repoName] = repo.split("/");
+  if (!owner || !repoName) throw new Error("El formato del repo debe ser usuario/repo.");
+
+  const defaultBranch = await getRepoDefaultBranch(accountId, repo);
+
+  const { data: compare } = await octokit.rest.repos.compareCommits({
+    owner,
+    repo: repoName,
+    base: defaultBranch,
+    head: branchName,
+  });
+
+  const commits = (compare.commits || [])
+    .filter((c) => c.author && c.author.login === account.username)
+    .map((c) => ({
+      sha: c.sha,
+      message: c.commit.message.split("\n")[0],
+      date: c.commit.committer?.date || "",
+    }));
+
+  const diffs = (compare.files || []).map((f) => ({
+    filename: f.filename,
+    patch: f.patch || "",
+    additions: f.additions,
+    deletions: f.deletions,
+  }));
+
+  return { branch: branchName, commits, diffs };
+}
+
+ipcMain.handle("github:getBranches", async (_, { accountId, repo }) => {
+  return fetchBranches(accountId, repo);
+});
+
+ipcMain.handle("github:getBranchChanges", async (_, { accountId, repo, branch }) => {
+  return fetchBranchChanges(accountId, repo, branch);
+});
+
 ipcMain.handle("github:getCommitDiffs", async (_, { accountId, repo, since, until }) => {
   return fetchUserCommitsAndDiffs(accountId, repo, since, until);
 });
@@ -469,6 +548,17 @@ ipcMain.handle("ai:generatePrDescriptionFromPr", async (_, { accountId, repo, pr
 
   const description = await generatePrDescription({ commits, diffs, notes, language });
   return { description };
+});
+
+ipcMain.handle("ai:generatePrDescriptionFromBranch", async (_, { accountId, repo, branch, notes, language }) => {
+  const { commits, diffs } = await fetchBranchChanges(accountId, repo, branch);
+
+  if (commits.length === 0) {
+    throw new Error("No se encontraron commits en la rama seleccionada.");
+  }
+
+  const description = await generatePrDescription({ commits, diffs, notes, language });
+  return { description, branch };
 });
 
 ipcMain.handle("ai:getConfig", () => {
