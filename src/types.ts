@@ -185,6 +185,7 @@ export interface PrDescriptionResponse {
 export interface AiApi {
   generatePrDescription: (data: PrDescriptionRequest) => Promise<PrDescriptionResponse>;
   generatePrDescriptionFromPr: (data: PrDescriptionFromPrRequest) => Promise<PrDescriptionResponse>;
+  generatePrDescriptionFromBranch: (data: PrDescriptionFromBranchRequest) => Promise<PrDescriptionResponse & { branch: string }>;
   getConfig: () => Promise<AiProviderConfig | null>;
   saveConfig: (config: AiProviderConfig) => Promise<boolean>;
   testConnection: () => Promise<{ success: boolean; error?: string }>;
@@ -196,4 +197,23 @@ export interface PrDescriptionFromPrRequest {
   prNumber: number;
   notes: string;
   language: Language;
+}
+
+export interface PrDescriptionFromBranchRequest {
+  accountId: number;
+  repo: string;
+  branch: string;
+  notes: string;
+  language: Language;
+}
+
+export interface BranchInfo {
+  name: string;
+  lastCommitDate: string;
+}
+
+export interface BranchChanges {
+  branch: string;
+  commits: { sha: string; message: string; date: string }[];
+  diffs: { filename: string; patch: string; additions: number; deletions: number }[];
 }

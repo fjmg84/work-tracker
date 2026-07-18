@@ -31,12 +31,18 @@ contextBridge.exposeInMainWorld("api", {
       ipcRenderer.invoke("github:validateToken", data),
     getCommitDiffs: (data: any) =>
       ipcRenderer.invoke("github:getCommitDiffs", data),
+    getBranches: (data: any) =>
+      ipcRenderer.invoke("github:getBranches", data),
+    getBranchChanges: (data: any) =>
+      ipcRenderer.invoke("github:getBranchChanges", data),
   },
   ai: {
     generatePrDescription: (data: any) =>
       ipcRenderer.invoke("ai:generatePrDescription", data),
     generatePrDescriptionFromPr: (data: any) =>
       ipcRenderer.invoke("ai:generatePrDescriptionFromPr", data),
+    generatePrDescriptionFromBranch: (data: any) =>
+      ipcRenderer.invoke("ai:generatePrDescriptionFromBranch", data),
     getConfig: () => ipcRenderer.invoke("ai:getConfig"),
     saveConfig: (config: any) => ipcRenderer.invoke("ai:saveConfig", config),
     testConnection: () => ipcRenderer.invoke("ai:testConnection"),

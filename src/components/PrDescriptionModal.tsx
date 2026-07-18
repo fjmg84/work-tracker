@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Language, AiProviderConfig } from "../types";
+import { Language, AiProviderConfig, BranchInfo, BranchChanges } from "../types";
 import {
   X,
   Copy,
@@ -8,6 +8,8 @@ import {
   AlertCircle,
   Settings,
   ExternalLink,
+  GitBranch,
+  FileText,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -16,8 +18,6 @@ interface PrDescriptionModalProps {
   onClose: () => void;
   accountId: number;
   repo: string;
-  startTime?: number;
-  endTime?: number;
   prNumber?: number;
   notes: string;
 }
@@ -35,8 +35,6 @@ export default function PrDescriptionModal({
   onClose,
   accountId,
   repo,
-  startTime,
-  endTime,
   prNumber,
   notes,
 }: PrDescriptionModalProps) {
@@ -56,19 +54,48 @@ export default function PrDescriptionModal({
     "idle" | "success" | "error"
   >("idle");
 
+  const [branches, setBranches] = useState<BranchInfo[]>([]);
+  const [selectedBranch, setSelectedBranch] = useState<string>("");
+  const [branchChanges, setBranchChanges] = useState<BranchChanges | null>(null);
+  const [loadingBranches, setLoadingBranches] = useState<boolean>(false);
+  const [loadingChanges, setLoadingChanges] = useState<boolean>(false);
+
   useEffect(() => {
     if (isOpen) {
       window.api.ai.getConfig().then((config) => {
-        if (config) {
-          setAiConfig(config);
-        }
+        if (config) setAiConfig(config);
       });
       setDescription("");
       setError(null);
       setCopied(false);
       setConnectionStatus("idle");
+      setBranchChanges(null);
+      setSelectedBranch("");
+
+      if (!prNumber) {
+        setLoadingBranches(true);
+        window.api.github
+          .getBranches({ accountId, repo })
+          .then((list) => {
+            setBranches(list);
+            if (list.length > 0) setSelectedBranch(list[0].name);
+          })
+          .catch(() => setBranches([]))
+          .finally(() => setLoadingBranches(false));
+      }
     }
   }, [isOpen]);
+
+  useEffect(() => {
+    if (!selectedBranch || prNumber) return;
+    setLoadingChanges(true);
+    setBranchChanges(null);
+    window.api.github
+      .getBranchChanges({ accountId, repo, branch: selectedBranch })
+      .then(setBranchChanges)
+      .catch(() => setBranchChanges(null))
+      .finally(() => setLoadingChanges(false));
+  }, [selectedBranch]);
 
   const handleGenerate = async () => {
     setLoading(true);
@@ -84,11 +111,10 @@ export default function PrDescriptionModal({
           language,
         });
       } else {
-        result = await window.api.ai.generatePrDescription({
+        result = await window.api.ai.generatePrDescriptionFromBranch({
           accountId,
           repo,
-          since: startTime!,
-          until: endTime!,
+          branch: selectedBranch,
           notes,
           language,
         });
@@ -278,11 +304,62 @@ export default function PrDescriptionModal({
             </div>
           )}
 
+          {/* Branch selector (non-PR mode) */}
+          {!prNumber && (
+            <div className="card !mb-0 space-y-3">
+              <h4 className="text-sm font-medium text-[var(--color-text-light)] dark:text-[var(--color-text-dark)] flex items-center gap-2">
+                <GitBranch className="w-4 h-4" />
+                Rama
+              </h4>
+              {loadingBranches ? (
+                <div className="flex items-center gap-2 text-sm text-[var(--color-text-muted-light)] dark:text-[var(--color-text-muted-dark)]">
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  Cargando ramas...
+                </div>
+              ) : branches.length === 0 ? (
+                <p className="text-sm text-[var(--color-text-muted-light)] dark:text-[var(--color-text-muted-dark)]">
+                  No se encontraron ramas en el repositorio.
+                </p>
+              ) : (
+                <select
+                  className="input"
+                  value={selectedBranch}
+                  onChange={(e) => setSelectedBranch(e.target.value)}
+                >
+                  {branches.map((b) => (
+                    <option key={b.name} value={b.name}>
+                      {b.name}
+                    </option>
+                  ))}
+                </select>
+              )}
+
+              {/* Branch changes preview */}
+              {loadingChanges && (
+                <div className="flex items-center gap-2 text-sm text-[var(--color-text-muted-light)] dark:text-[var(--color-text-muted-dark)]">
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  Cargando cambios...
+                </div>
+              )}
+              {branchChanges && !loadingChanges && (
+                <div className="flex items-center gap-4 text-sm text-[var(--color-text-muted-light)] dark:text-[var(--color-text-muted-dark)]">
+                  <span className="flex items-center gap-1">
+                    <FileText className="w-4 h-4" />
+                    {branchChanges.commits.length} commit{branchChanges.commits.length !== 1 ? "s" : ""}
+                  </span>
+                  <span>
+                    {branchChanges.diffs.length} archivo{branchChanges.diffs.length !== 1 ? "s" : ""} modificado{branchChanges.diffs.length !== 1 ? "s" : ""}
+                  </span>
+                </div>
+              )}
+            </div>
+          )}
+
           {/* Generate button */}
           {!description && !loading && (
             <button
               onClick={handleGenerate}
-              disabled={!hasApiKey}
+              disabled={!hasApiKey || (!prNumber && !selectedBranch)}
               className="btn btn-primary w-full py-3 text-base flex items-center justify-center gap-2"
             >
               Generar Descripción
