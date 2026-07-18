@@ -1,3 +1,5 @@
+# Este cambio es solo para probar la generacion de descripcion del PR
+
 # Work Tracker
 
 App de escritorio para registrar horas de trabajo, proyectos, PRs y commits de GitHub, y generar reportes mensuales en CSV.
