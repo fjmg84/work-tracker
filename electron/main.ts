@@ -333,7 +333,6 @@ async function fetchUserCommitsAndDiffs(accountId: number, repo: string, since: 
     repoCommits = await octokit.paginate(octokit.rest.repos.listCommits, {
       owner,
       repo: repoName,
-      author: account.username,
       since: new Date(since).toISOString(),
       until: new Date(until).toISOString(),
       per_page: 100,
@@ -342,7 +341,15 @@ async function fetchUserCommitsAndDiffs(accountId: number, repo: string, since: 
     throw new Error(`Error al obtener commits: ${error.message}`);
   }
 
-  for (const c of repoCommits) {
+  const userCommits = repoCommits.filter(
+    (c) => c.author && c.author.login === account.username
+  );
+  console.log("[PR Desc] repoCommits total:", repoCommits.length, "userCommits:", userCommits.length, "account.username:", account.username);
+  if (repoCommits.length > 0 && userCommits.length === 0) {
+    console.log("[PR Desc] sample authors:", repoCommits.slice(0, 3).map((c: any) => ({ login: c.author?.login, name: c.commit.author?.name, email: c.commit.author?.email })));
+  }
+
+  for (const c of userCommits) {
     commits.push({
       sha: c.sha,
       message: c.commit.message.split("\n")[0],
@@ -440,7 +447,10 @@ ipcMain.handle("github:getCommitDiffs", async (_, { accountId, repo, since, unti
 // ============================================================
 
 ipcMain.handle("ai:generatePrDescription", async (_, { accountId, repo, since, until, notes, language }) => {
+  console.log("[PR Desc] accountId:", accountId, "repo:", repo, "since:", since, "until:", until);
+  console.log("[PR Desc] since date:", new Date(since).toISOString(), "until date:", new Date(until).toISOString());
   const { commits, diffs } = await fetchUserCommitsAndDiffs(accountId, repo, since, until);
+  console.log("[PR Desc] commits found:", commits.length, "diffs found:", diffs.length);
 
   if (commits.length === 0) {
     throw new Error("No se encontraron commits en el período seleccionado.");
