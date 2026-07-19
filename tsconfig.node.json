@@ -16,8 +16,7 @@
     "skipLibCheck": true,
     "forceConsistentCasingInFileNames": true,
     "outDir": "electron/dist",
-    "rootDir": "electron",
-    "composite": true
+    "rootDir": "electron"
   },
   "include": [
     "electron"

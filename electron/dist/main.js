@@ -293,7 +293,6 @@ async function fetchUserCommitsAndDiffs(accountId, repo, since, until) {
         repoCommits = await octokit.paginate(octokit.rest.repos.listCommits, {
             owner,
             repo: repoName,
-            author: account.username,
             since: new Date(since).toISOString(),
             until: new Date(until).toISOString(),
             per_page: 100,
@@ -302,7 +301,12 @@ async function fetchUserCommitsAndDiffs(accountId, repo, since, until) {
     catch (error) {
         throw new Error(`Error al obtener commits: ${error.message}`);
     }
-    for (const c of repoCommits) {
+    const userCommits = repoCommits.filter((c) => c.author && c.author.login === account.username);
+    console.log("[PR Desc] repoCommits total:", repoCommits.length, "userCommits:", userCommits.length, "account.username:", account.username);
+    if (repoCommits.length > 0 && userCommits.length === 0) {
+        console.log("[PR Desc] sample authors:", repoCommits.slice(0, 3).map((c) => ({ login: c.author?.login, name: c.commit.author?.name, email: c.commit.author?.email })));
+    }
+    for (const c of userCommits) {
         commits.push({
             sha: c.sha,
             message: c.commit.message.split("\n")[0],
@@ -384,6 +388,78 @@ async function fetchPrCommitsAndDiffs(accountId, repo, prNumber) {
     }
     return { commits, diffs };
 }
+async function getRepoDefaultBranch(accountId, repo) {
+    const token = safeGetToken(accountId);
+    if (!token)
+        throw new Error("No se encontró token para esta cuenta.");
+    const octokit = new rest_1.Octokit({ auth: token });
+    const [owner, repoName] = repo.split("/");
+    if (!owner || !repoName)
+        throw new Error("El formato del repo debe ser usuario/repo.");
+    const { data } = await octokit.rest.repos.get({ owner, repo: repoName });
+    return data.default_branch;
+}
+async function fetchBranches(accountId, repo) {
+    const token = safeGetToken(accountId);
+    if (!token)
+        throw new Error("No se encontró token para esta cuenta.");
+    const octokit = new rest_1.Octokit({ auth: token });
+    const [owner, repoName] = repo.split("/");
+    if (!owner || !repoName)
+        throw new Error("El formato del repo debe ser usuario/repo.");
+    const defaultBranch = await getRepoDefaultBranch(accountId, repo);
+    const { data: branches } = await octokit.rest.repos.listBranches({
+        owner,
+        repo: repoName,
+        per_page: 100,
+    });
+    return branches
+        .filter((b) => b.name !== defaultBranch)
+        .map((b) => ({
+        name: b.name,
+        lastCommitDate: b.commit.commit?.committer?.date || "",
+    }))
+        .sort((a, b) => b.lastCommitDate.localeCompare(a.lastCommitDate));
+}
+async function fetchBranchChanges(accountId, repo, branchName) {
+    const token = safeGetToken(accountId);
+    if (!token)
+        throw new Error("No se encontró token para esta cuenta.");
+    const octokit = new rest_1.Octokit({ auth: token });
+    const account = queries_1.accountQueries.getById(connection_1.default, accountId);
+    if (!account)
+        throw new Error("Cuenta no encontrada.");
+    const [owner, repoName] = repo.split("/");
+    if (!owner || !repoName)
+        throw new Error("El formato del repo debe ser usuario/repo.");
+    const defaultBranch = await getRepoDefaultBranch(accountId, repo);
+    const { data: compare } = await octokit.rest.repos.compareCommits({
+        owner,
+        repo: repoName,
+        base: defaultBranch,
+        head: branchName,
+    });
+    const commits = (compare.commits || [])
+        .filter((c) => c.author && c.author.login === account.username)
+        .map((c) => ({
+        sha: c.sha,
+        message: c.commit.message.split("\n")[0],
+        date: c.commit.committer?.date || "",
+    }));
+    const diffs = (compare.files || []).map((f) => ({
+        filename: f.filename,
+        patch: f.patch || "",
+        additions: f.additions,
+        deletions: f.deletions,
+    }));
+    return { branch: branchName, commits, diffs };
+}
+electron_1.ipcMain.handle("github:getBranches", async (_, { accountId, repo }) => {
+    return fetchBranches(accountId, repo);
+});
+electron_1.ipcMain.handle("github:getBranchChanges", async (_, { accountId, repo, branch }) => {
+    return fetchBranchChanges(accountId, repo, branch);
+});
 electron_1.ipcMain.handle("github:getCommitDiffs", async (_, { accountId, repo, since, until }) => {
     return fetchUserCommitsAndDiffs(accountId, repo, since, until);
 });
@@ -391,7 +467,10 @@ electron_1.ipcMain.handle("github:getCommitDiffs", async (_, { accountId, repo, 
 // IPC: AI
 // ============================================================
 electron_1.ipcMain.handle("ai:generatePrDescription", async (_, { accountId, repo, since, until, notes, language }) => {
+    console.log("[PR Desc] accountId:", accountId, "repo:", repo, "since:", since, "until:", until);
+    console.log("[PR Desc] since date:", new Date(since).toISOString(), "until date:", new Date(until).toISOString());
     const { commits, diffs } = await fetchUserCommitsAndDiffs(accountId, repo, since, until);
+    console.log("[PR Desc] commits found:", commits.length, "diffs found:", diffs.length);
     if (commits.length === 0) {
         throw new Error("No se encontraron commits en el período seleccionado.");
     }
@@ -405,6 +484,14 @@ electron_1.ipcMain.handle("ai:generatePrDescriptionFromPr", async (_, { accountI
     }
     const description = await (0, ai_1.generatePrDescription)({ commits, diffs, notes, language });
     return { description };
+});
+electron_1.ipcMain.handle("ai:generatePrDescriptionFromBranch", async (_, { accountId, repo, branch, notes, language }) => {
+    const { commits, diffs } = await fetchBranchChanges(accountId, repo, branch);
+    if (commits.length === 0) {
+        throw new Error("No se encontraron commits en la rama seleccionada.");
+    }
+    const description = await (0, ai_1.generatePrDescription)({ commits, diffs, notes, language });
+    return { description, branch };
 });
 electron_1.ipcMain.handle("ai:getConfig", () => {
     return (0, ai_1.loadAiConfig)();
