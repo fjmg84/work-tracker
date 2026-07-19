@@ -10,7 +10,8 @@ work-tracker-video/
 
 .DS_Store
 
-.agents/
+.agents
+.agents/*
 .opencode
 .windsurf
 .claude
