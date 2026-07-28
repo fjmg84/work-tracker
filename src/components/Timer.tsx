@@ -123,6 +123,7 @@ export default function Timer({ projects, onSessionChange }: TimerProps) {
       notes,
     });
     setActiveSession(session);
+    window.api.tray.startTimer();
     onSessionChange();
   };
 
@@ -145,6 +146,7 @@ export default function Timer({ projects, onSessionChange }: TimerProps) {
     }
     setActiveSession(null);
     setNotes("");
+    window.api.tray.stopTimer();
     onSessionChange();
     const activeMs =
       (updated.end_time ?? 0) - updated.start_time - updated.total_paused_ms;
@@ -155,12 +157,14 @@ export default function Timer({ projects, onSessionChange }: TimerProps) {
     if (!activeSession || isPaused) return;
     const updated = await window.api.db.pauseSession({ id: activeSession.id });
     setActiveSession(updated);
+    window.api.tray.pauseTimer();
   };
 
   const resume = async () => {
     if (!activeSession || !isPaused) return;
     const updated = await window.api.db.resumeSession({ id: activeSession.id });
     setActiveSession(updated);
+    window.api.tray.resumeTimer();
   };
 
   const closeStaleSessions = async () => {

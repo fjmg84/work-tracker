@@ -52,6 +52,12 @@ contextBridge.exposeInMainWorld("api", {
     showSaveDialog: (options: any) =>
       ipcRenderer.invoke("app:showSaveDialog", options),
   },
+  tray: {
+    startTimer: () => ipcRenderer.invoke("tray:startTimer"),
+    stopTimer: () => ipcRenderer.invoke("tray:stopTimer"),
+    pauseTimer: () => ipcRenderer.invoke("tray:pauseTimer"),
+    resumeTimer: () => ipcRenderer.invoke("tray:resumeTimer"),
+  },
   on: (channel: string, callback: (...args: any[]) => void) => {
     const listener = (_event: any, ...args: any[]) => callback(...args);
     ipcRenderer.on(channel, listener);

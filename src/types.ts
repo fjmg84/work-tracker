@@ -149,6 +149,13 @@ export interface AppApi {
   }) => Promise<ElectronSaveDialogResult>;
 }
 
+export interface TrayApi {
+  startTimer: () => Promise<boolean>;
+  stopTimer: () => Promise<boolean>;
+  pauseTimer: () => Promise<boolean>;
+  resumeTimer: () => Promise<boolean>;
+}
+
 export interface ElectronSaveDialogResult {
   canceled: boolean;
   filePath?: string;
@@ -159,6 +166,7 @@ export interface Api {
   github: GitHubApi;
   ai: AiApi;
   app: AppApi;
+  tray: TrayApi;
   on: (channel: string, callback: (...args: any[]) => void) => () => void;
 }
 

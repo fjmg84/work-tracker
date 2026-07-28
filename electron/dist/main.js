@@ -11,6 +11,7 @@ const connection_1 = __importDefault(require("./db/connection"));
 const migrations_1 = require("./db/migrations");
 const queries_1 = require("./db/queries");
 const ai_1 = require("./ai");
+const tray_1 = require("./tray");
 const isDev = !electron_1.app.isPackaged;
 const PORT = 5170;
 (0, migrations_1.initializeSchema)(connection_1.default);
@@ -41,6 +42,7 @@ function safeDeleteToken(accountId) {
 // Window
 // ============================================================
 let mainWindow = null;
+let isQuitting = false;
 function createWindow() {
     mainWindow = new electron_1.BrowserWindow({
         width: 1000,
@@ -58,6 +60,17 @@ function createWindow() {
     else {
         mainWindow.loadFile(path_1.default.join(__dirname, "../../dist/index.html"));
     }
+    mainWindow.on("close", (e) => {
+        if (!isQuitting) {
+            const session = queries_1.sessionQueries.getActive(connection_1.default);
+            if (session) {
+                e.preventDefault();
+                mainWindow?.hide();
+                return;
+            }
+        }
+        mainWindow = null;
+    });
     mainWindow.on("closed", () => {
         mainWindow = null;
     });
@@ -67,6 +80,9 @@ function createWindow() {
 // ============================================================
 electron_1.app.whenReady().then(() => {
     createWindow();
+    if (mainWindow) {
+        (0, tray_1.initTray)(mainWindow);
+    }
     // Power monitor: auto-pause active session on suspend
     electron_1.powerMonitor.on("suspend", () => {
         const session = queries_1.sessionQueries.getActiveUnpaused(connection_1.default);
@@ -97,6 +113,7 @@ function closeActiveSessions() {
     queries_1.sessionQueries.closeAllActive(connection_1.default, { end_time: Date.now() });
 }
 electron_1.app.on("before-quit", () => {
+    isQuitting = true;
     closeActiveSessions();
 });
 electron_1.app.on("window-all-closed", () => {
@@ -516,4 +533,23 @@ electron_1.ipcMain.handle("app:showSaveDialog", async (_, { defaultPath }) => {
         filters: [{ name: "CSV", extensions: ["csv"] }],
     });
     return result;
+});
+// ============================================================
+// IPC: Tray
+// ============================================================
+electron_1.ipcMain.handle("tray:startTimer", () => {
+    (0, tray_1.notifySessionStarted)();
+    return true;
+});
+electron_1.ipcMain.handle("tray:stopTimer", () => {
+    (0, tray_1.notifySessionStopped)();
+    return true;
+});
+electron_1.ipcMain.handle("tray:pauseTimer", () => {
+    (0, tray_1.notifySessionPaused)();
+    return true;
+});
+electron_1.ipcMain.handle("tray:resumeTimer", () => {
+    (0, tray_1.notifySessionResumed)();
+    return true;
 });

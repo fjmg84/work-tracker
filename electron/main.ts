@@ -6,6 +6,7 @@ import db from "./db/connection";
 import { initializeSchema } from "./db/migrations";
 import { accountQueries, projectQueries, sessionQueries } from "./db/queries";
 import { generatePrDescription, loadAiConfig, saveAiConfig, testAiConnection } from "./ai";
+import { initTray, notifySessionStarted, notifySessionStopped, notifySessionPaused, notifySessionResumed } from "./tray";
 
 const isDev = !app.isPackaged;
 const PORT = 5170;
@@ -42,6 +43,7 @@ function safeDeleteToken(accountId: number): void {
 // ============================================================
 
 let mainWindow: BrowserWindow | null = null;
+let isQuitting = false;
 
 function createWindow(): void {
   mainWindow = new BrowserWindow({
@@ -61,6 +63,18 @@ function createWindow(): void {
     mainWindow.loadFile(path.join(__dirname, "../../dist/index.html"));
   }
 
+  mainWindow.on("close", (e) => {
+    if (!isQuitting) {
+      const session = sessionQueries.getActive(db);
+      if (session) {
+        e.preventDefault();
+        mainWindow?.hide();
+        return;
+      }
+    }
+    mainWindow = null;
+  });
+
   mainWindow.on("closed", () => {
     mainWindow = null;
   });
@@ -72,6 +86,10 @@ function createWindow(): void {
 
 app.whenReady().then(() => {
   createWindow();
+
+  if (mainWindow) {
+    initTray(mainWindow);
+  }
 
   // Power monitor: auto-pause active session on suspend
   powerMonitor.on("suspend", () => {
@@ -107,6 +125,7 @@ function closeActiveSessions(): void {
 }
 
 app.on("before-quit", () => {
+  isQuitting = true;
   closeActiveSessions();
 });
 
@@ -589,4 +608,28 @@ ipcMain.handle("app:showSaveDialog", async (_, { defaultPath }) => {
     filters: [{ name: "CSV", extensions: ["csv"] }],
   });
   return result;
+});
+
+// ============================================================
+// IPC: Tray
+// ============================================================
+
+ipcMain.handle("tray:startTimer", () => {
+  notifySessionStarted();
+  return true;
+});
+
+ipcMain.handle("tray:stopTimer", () => {
+  notifySessionStopped();
+  return true;
+});
+
+ipcMain.handle("tray:pauseTimer", () => {
+  notifySessionPaused();
+  return true;
+});
+
+ipcMain.handle("tray:resumeTimer", () => {
+  notifySessionResumed();
+  return true;
 });

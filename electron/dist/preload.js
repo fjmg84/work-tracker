@@ -39,6 +39,12 @@ electron_1.contextBridge.exposeInMainWorld("api", {
         exportCsv: (data) => electron_1.ipcRenderer.invoke("app:exportCsv", data),
         showSaveDialog: (options) => electron_1.ipcRenderer.invoke("app:showSaveDialog", options),
     },
+    tray: {
+        startTimer: () => electron_1.ipcRenderer.invoke("tray:startTimer"),
+        stopTimer: () => electron_1.ipcRenderer.invoke("tray:stopTimer"),
+        pauseTimer: () => electron_1.ipcRenderer.invoke("tray:pauseTimer"),
+        resumeTimer: () => electron_1.ipcRenderer.invoke("tray:resumeTimer"),
+    },
     on: (channel, callback) => {
         const listener = (_event, ...args) => callback(...args);
         electron_1.ipcRenderer.on(channel, listener);
