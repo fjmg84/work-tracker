@@ -20,7 +20,8 @@ interface ReportsProps {
 export default function Reports({ projects }: ReportsProps) {
   const [year, setYear] = useState<number>(new Date().getFullYear());
   const [month, setMonth] = useState<number>(new Date().getMonth() + 1);
-  const [selectedProject, setSelectedProject] = useState<number | null>(null);
+  const [selectedProjects, setSelectedProjects] = useState<number[]>([]);
+  const [allSessions, setAllSessions] = useState<Session[]>([]);
   const [sessions, setSessions] = useState<Session[]>([]);
   const [activity, setActivity] = useState<{
     prs: PullRequest[];
@@ -30,7 +31,7 @@ export default function Reports({ projects }: ReportsProps) {
 
   useEffect(() => {
     loadData();
-  }, [year, month, projects, selectedProject]);
+  }, [year, month, projects, selectedProjects]);
 
   const loadData = async () => {
     const start = new Date(year, month - 1, 1).getTime();
@@ -41,18 +42,19 @@ export default function Reports({ projects }: ReportsProps) {
       to: end,
     });
 
-    // Filter sessions by project if selected
-    const filteredSessions = selectedProject
-      ? sessionData.filter((s) => s.project_id === selectedProject)
+    setAllSessions(sessionData);
+
+    // ponytail: selectedProjects === [] means "all"
+    const filteredSessions = selectedProjects.length
+      ? sessionData.filter((s) => selectedProjects.includes(s.project_id))
       : sessionData;
     setSessions(filteredSessions);
 
     const allPrs: (PullRequest | GitHubActivityError)[] = [];
     const allCommits: Commit[] = [];
 
-    // Filter projects to load based on selection
-    const projectsToLoad = selectedProject
-      ? projects.filter((p) => p.id === selectedProject)
+    const projectsToLoad = selectedProjects.length
+      ? projects.filter((p) => selectedProjects.includes(p.id))
       : projects;
 
     for (const project of projectsToLoad) {
@@ -122,6 +124,10 @@ export default function Reports({ projects }: ReportsProps) {
     toast.success("CSV exportado correctamente");
   };
 
+  // ponytail: only show projects that have sessions this month
+  const activeProjectIds = new Set(allSessions.map((s) => s.project_id));
+  const activeProjects = projects.filter((p) => activeProjectIds.has(p.id));
+
   const sessionsFiltered = sessions.filter((s) => s.end_time);
   const sessionsByWeek: Record<string, Record<string, Session[]>> = {};
   for (const s of sessionsFiltered) {
@@ -149,20 +155,37 @@ export default function Reports({ projects }: ReportsProps) {
           onMonthChange={setMonth}
         />
         <div className="flex-1">
-          <select
-            className="input"
-            value={selectedProject || ""}
-            onChange={(e) =>
-              setSelectedProject(e.target.value ? Number(e.target.value) : null)
-            }
-          >
-            <option value="">Todos los proyectos</option>
-            {projects.map((p) => (
-              <option key={p.id} value={p.id}>
-                {p.name}
-              </option>
+          <div className="input max-h-32 overflow-y-auto">
+            <label className="flex items-center gap-2 cursor-pointer mb-1 last:mb-0">
+              <input
+                type="checkbox"
+                className="accent-[var(--color-primary)]"
+                checked={selectedProjects.length === 0}
+                onChange={() => setSelectedProjects([])}
+              />
+              <span className="text-sm">Todos</span>
+            </label>
+            {activeProjects.map((p) => (
+              <label
+                key={p.id}
+                className="flex items-center gap-2 cursor-pointer mb-1 last:mb-0"
+              >
+                <input
+                  type="checkbox"
+                  className="accent-[var(--color-primary)]"
+                  checked={selectedProjects.includes(p.id)}
+                  onChange={() =>
+                    setSelectedProjects((prev) =>
+                      prev.includes(p.id)
+                        ? prev.filter((id) => id !== p.id)
+                        : [...prev, p.id],
+                    )
+                  }
+                />
+                <span className="text-sm truncate">{p.name}</span>
+              </label>
             ))}
-          </select>
+          </div>
         </div>
         <div className="flex-1">
           <button
