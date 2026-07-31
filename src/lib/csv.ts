@@ -62,7 +62,7 @@ function generateReport({
       account_label: "-",
       account_username: "-",
     };
-    const duration = Math.round(((s.end_time ?? 0) - s.start_time) / 60000);
+    const duration = Math.round(((s.end_time ?? 0) - s.start_time - (s.total_paused_ms ?? 0)) / 60000);
     totalMinutes += duration;
     projectHours[project.name] = (projectHours[project.name] || 0) + duration;
 
