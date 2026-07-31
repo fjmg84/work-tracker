@@ -94,7 +94,7 @@ export default function Reports({ projects }: ReportsProps) {
 
     const filtered = filteredSessions.filter((s) => s.end_time);
     const totalMinutes = filtered.reduce(
-      (acc, s) => acc + Math.round(((s.end_time ?? 0) - s.start_time) / 60000),
+      (acc, s) => acc + Math.round(((s.end_time ?? 0) - s.start_time - (s.total_paused_ms ?? 0)) / 60000),
       0,
     );
     setSummary({
@@ -199,7 +199,7 @@ export default function Reports({ projects }: ReportsProps) {
                 const dayMinutes = daySessions.reduce(
                   (acc, s) =>
                     acc +
-                    Math.round(((s.end_time ?? 0) - s.start_time) / 60000),
+                    Math.round(((s.end_time ?? 0) - s.start_time - (s.total_paused_ms ?? 0)) / 60000),
                   0,
                 );
                 weekMinutes += dayMinutes;
@@ -223,7 +223,7 @@ export default function Reports({ projects }: ReportsProps) {
                             account_label: "-",
                           };
                           const minutes = Math.round(
-                            ((s.end_time ?? 0) - s.start_time) / 60000,
+                            ((s.end_time ?? 0) - s.start_time - (s.total_paused_ms ?? 0)) / 60000,
                           );
                           return (
                             <li
