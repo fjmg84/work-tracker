@@ -1,5 +1,10 @@
 import { useState, useEffect } from "react";
-import { Language, AiProviderConfig, BranchInfo, BranchChanges } from "../types";
+import {
+  Language,
+  AiProviderConfig,
+  BranchInfo,
+  BranchChanges,
+} from "../types";
 import {
   X,
   Copy,
@@ -56,7 +61,9 @@ export default function PrDescriptionModal({
 
   const [branches, setBranches] = useState<BranchInfo[]>([]);
   const [selectedBranch, setSelectedBranch] = useState<string>("");
-  const [branchChanges, setBranchChanges] = useState<BranchChanges | null>(null);
+  const [branchChanges, setBranchChanges] = useState<BranchChanges | null>(
+    null,
+  );
   const [loadingBranches, setLoadingBranches] = useState<boolean>(false);
   const [loadingChanges, setLoadingChanges] = useState<boolean>(false);
 
@@ -160,10 +167,10 @@ export default function PrDescriptionModal({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-      <div className="bg-[var(--color-surface-light)] dark:bg-[var(--color-surface-dark)] rounded-lg shadow-xl w-full max-w-2xl max-h-[80vh] flex flex-col border border-[var(--color-border-light)] dark:border-[var(--color-border-dark)]">
+      <div className="bg-surface-light dark:bg-surface-dark rounded-lg shadow-xl w-full max-w-2xl max-h-[80vh] flex flex-col border border-border-light dark:border-border-dark">
         {/* Header */}
-        <div className="flex items-center justify-between p-4 border-b border-[var(--color-border-light)] dark:border-[var(--color-border-dark)]">
-          <h2 className="text-lg font-semibold text-[var(--color-text-light)] dark:text-[var(--color-text-dark)]">
+        <div className="flex items-center justify-between p-4 border-b border-border-light dark:border-border-dark">
+          <h2 className="text-lg font-semibold text-text-light dark:text-text-dark">
             Generar Descripción de PR
           </h2>
           <button
@@ -179,15 +186,15 @@ export default function PrDescriptionModal({
         <div className="flex-1 overflow-y-auto p-4 space-y-4">
           {/* Language selector + Settings toggle */}
           <div className="flex items-center gap-3">
-            <label className="text-sm text-[var(--color-text-muted-light)] dark:text-[var(--color-text-muted-dark)]">
+            <label className="text-sm text-text-muted-light dark:text-text-muted-dark">
               Idioma:
             </label>
-            <div className="flex rounded-md border border-[var(--color-border-light)] dark:border-[var(--color-border-dark)] overflow-hidden">
+            <div className="flex rounded-md border border-border-light dark:border-border-dark overflow-hidden">
               <button
                 className={`px-3 py-1.5 text-sm transition-colors ${
                   language === "es"
-                    ? "bg-[var(--color-primary)] text-white"
-                    : "bg-[var(--color-surface-light)] dark:bg-[var(--color-surface-dark)] text-[var(--color-text-light)] dark:text-[var(--color-text-dark)] hover:bg-[var(--color-surface-muted-light)] dark:hover:bg-[var(--color-surface-muted-dark)]"
+                    ? "bg-primary text-white"
+                    : "bg-surface-light dark:bg-surface-dark text-text-light dark:text-text-dark hover:bg-surface-muted-light dark:hover:bg-surface-muted-dark"
                 }`}
                 onClick={() => setLanguage("es")}
               >
@@ -196,8 +203,8 @@ export default function PrDescriptionModal({
               <button
                 className={`px-3 py-1.5 text-sm transition-colors ${
                   language === "en"
-                    ? "bg-[var(--color-primary)] text-white"
-                    : "bg-[var(--color-surface-light)] dark:bg-[var(--color-surface-dark)] text-[var(--color-text-light)] dark:text-[var(--color-text-dark)] hover:bg-[var(--color-surface-muted-light)] dark:hover:bg-[var(--color-surface-muted-dark)]"
+                    ? "bg-primary text-white"
+                    : "bg-surface-light dark:bg-surface-dark text-text-light dark:text-text-dark hover:bg-surface-muted-light dark:hover:bg-surface-muted-dark"
                 }`}
                 onClick={() => setLanguage("en")}
               >
@@ -223,21 +230,21 @@ export default function PrDescriptionModal({
           {showSettings && (
             <div className="card !mb-0 space-y-3">
               <div className="flex items-center justify-between">
-                <h4 className="text-sm font-medium text-[var(--color-text-light)] dark:text-[var(--color-text-dark)]">
+                <h4 className="text-sm font-medium text-text-light dark:text-text-dark">
                   Configuración de OpenRouter
                 </h4>
                 <a
                   href="https://openrouter.ai/keys"
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="text-xs text-[var(--color-primary)] hover:underline flex items-center gap-1"
+                  className="text-xs text-primary hover:underline flex items-center gap-1"
                 >
                   Obtener API key
                   <ExternalLink className="w-3 h-3" />
                 </a>
               </div>
               <div>
-                <label className="block text-sm text-[var(--color-text-muted-light)] dark:text-[var(--color-text-muted-dark)] mb-1">
+                <label className="block text-sm text-text-muted-light dark:text-text-muted-dark mb-1">
                   API Key
                 </label>
                 <input
@@ -251,7 +258,7 @@ export default function PrDescriptionModal({
                 />
               </div>
               <div>
-                <label className="block text-sm text-[var(--color-text-muted-light)] dark:text-[var(--color-text-muted-dark)] mb-1">
+                <label className="block text-sm text-text-muted-light dark:text-text-muted-dark mb-1">
                   Modelo
                 </label>
                 <select
@@ -267,13 +274,13 @@ export default function PrDescriptionModal({
                     </option>
                   ))}
                 </select>
-                <p className="text-xs text-[var(--color-text-muted-light)] dark:text-[var(--color-text-muted-dark)] mt-1">
+                <p className="text-xs text-text-muted-light dark:text-text-muted-dark mt-1">
                   O escribe un modelo personalizado de{" "}
                   <a
                     href="https://openrouter.ai/models"
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="text-[var(--color-primary)] hover:underline"
+                    className="text-primary hover:underline"
                   >
                     openrouter.ai/models
                   </a>
@@ -307,17 +314,17 @@ export default function PrDescriptionModal({
           {/* Branch selector (non-PR mode) */}
           {!prNumber && (
             <div className="card !mb-0 space-y-3">
-              <h4 className="text-sm font-medium text-[var(--color-text-light)] dark:text-[var(--color-text-dark)] flex items-center gap-2">
+              <h4 className="text-sm font-medium text-text-light dark:text-text-dark flex items-center gap-2">
                 <GitBranch className="w-4 h-4" />
                 Rama
               </h4>
               {loadingBranches ? (
-                <div className="flex items-center gap-2 text-sm text-[var(--color-text-muted-light)] dark:text-[var(--color-text-muted-dark)]">
+                <div className="flex items-center gap-2 text-sm text-text-muted-light dark:text-text-muted-dark">
                   <Loader2 className="w-4 h-4 animate-spin" />
                   Cargando ramas...
                 </div>
               ) : branches.length === 0 ? (
-                <p className="text-sm text-[var(--color-text-muted-light)] dark:text-[var(--color-text-muted-dark)]">
+                <p className="text-sm text-text-muted-light dark:text-text-muted-dark">
                   No se encontraron ramas en el repositorio.
                 </p>
               ) : (
@@ -336,19 +343,22 @@ export default function PrDescriptionModal({
 
               {/* Branch changes preview */}
               {loadingChanges && (
-                <div className="flex items-center gap-2 text-sm text-[var(--color-text-muted-light)] dark:text-[var(--color-text-muted-dark)]">
+                <div className="flex items-center gap-2 text-sm text-text-muted-light dark:text-text-muted-dark">
                   <Loader2 className="w-4 h-4 animate-spin" />
                   Cargando cambios...
                 </div>
               )}
               {branchChanges && !loadingChanges && (
-                <div className="flex items-center gap-4 text-sm text-[var(--color-text-muted-light)] dark:text-[var(--color-text-muted-dark)]">
+                <div className="flex items-center gap-4 text-sm text-text-muted-light dark:text-text-muted-dark">
                   <span className="flex items-center gap-1">
                     <FileText className="w-4 h-4" />
-                    {branchChanges.commits.length} commit{branchChanges.commits.length !== 1 ? "s" : ""}
+                    {branchChanges.commits.length} commit
+                    {branchChanges.commits.length !== 1 ? "s" : ""}
                   </span>
                   <span>
-                    {branchChanges.diffs.length} archivo{branchChanges.diffs.length !== 1 ? "s" : ""} modificado{branchChanges.diffs.length !== 1 ? "s" : ""}
+                    {branchChanges.diffs.length} archivo
+                    {branchChanges.diffs.length !== 1 ? "s" : ""} modificado
+                    {branchChanges.diffs.length !== 1 ? "s" : ""}
                   </span>
                 </div>
               )}
@@ -369,8 +379,8 @@ export default function PrDescriptionModal({
           {/* Loading */}
           {loading && (
             <div className="flex flex-col items-center justify-center py-8 gap-3">
-              <Loader2 className="w-8 h-8 animate-spin text-[var(--color-primary)]" />
-              <p className="text-sm text-[var(--color-text-muted-light)] dark:text-[var(--color-text-muted-dark)]">
+              <Loader2 className="w-8 h-8 animate-spin text-primary" />
+              <p className="text-sm text-text-muted-light dark:text-text-muted-dark">
                 Generando descripción con OpenRouter...
               </p>
             </div>
@@ -392,7 +402,7 @@ export default function PrDescriptionModal({
           {description && (
             <div className="space-y-2">
               <div className="flex items-center justify-between">
-                <label className="text-sm text-[var(--color-text-muted-light)] dark:text-[var(--color-text-muted-dark)]">
+                <label className="text-sm text-text-muted-light dark:text-text-muted-dark">
                   Descripción generada:
                 </label>
                 <div className="flex gap-2">
@@ -426,7 +436,7 @@ export default function PrDescriptionModal({
         </div>
 
         {/* Footer */}
-        <div className="flex justify-end gap-2 p-4 border-t border-[var(--color-border-light)] dark:border-[var(--color-border-dark)]">
+        <div className="flex justify-end gap-2 p-4 border-t border-border-light dark:border-border-dark">
           <button onClick={onClose} className="btn btn-secondary">
             Cerrar
           </button>

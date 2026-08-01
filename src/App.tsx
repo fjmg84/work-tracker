@@ -1,10 +1,10 @@
-import { useState, useEffect } from "react";
+import { useEffect, useState } from "react";
 import Timer from "./components/Timer";
 import Projects from "./components/Projects";
 import Accounts from "./components/Accounts";
 import Reports from "./components/Reports";
 import Activity from "./components/Activity";
-import { Project, Account } from "./types";
+import { useAppStore } from "./store/appStore";
 import { useTheme } from "./hooks/useTheme";
 import {
   Timer as TimerIcon,
@@ -26,74 +26,67 @@ const TABS: Tab[] = [
   {
     id: "timer",
     label: "Cronómetro",
-    icon: <TimerIcon className="w-[18px] h-[18px]" />,
+    icon: <TimerIcon className="w-4.5 h-4.5" />,
   },
   {
     id: "projects",
     label: "Proyectos",
-    icon: <FolderGit2 className="w-[18px] h-[18px]" />,
+    icon: <FolderGit2 className="w-4.5 h-4.5" />,
   },
   {
     id: "accounts",
     label: "Cuentas GitHub",
-    icon: <User className="w-[18px] h-[18px]" />,
+    icon: <User className="w-4.5 h-4.5" />,
   },
   {
     id: "activity",
     label: "Actividad",
-    icon: <ActivityIcon className="w-[18px] h-[18px]" />,
+    icon: <ActivityIcon className="w-4.5 h-4.5" />,
   },
   {
     id: "reports",
     label: "Reportes",
-    icon: <BarChart3 className="w-[18px] h-[18px]" />,
+    icon: <BarChart3 className="w-4.5 h-4.5" />,
   },
 ];
 
+const TAB_CONTENT: Record<string, () => React.ReactNode> = {
+  timer: () => <Timer />,
+  projects: () => <Projects />,
+  accounts: () => <Accounts />,
+  activity: () => <Activity />,
+  reports: () => <Reports />,
+};
+
 export default function App() {
   const [activeTab, setActiveTab] = useState<string>("timer");
-  const [projects, setProjects] = useState<Project[]>([]);
-  const [accounts, setAccounts] = useState<Account[]>([]);
-  const [refreshFlag, setRefreshFlag] = useState<number>(0);
+  // Las pestañas se montan la primera vez que se visitan y luego quedan
+  // vivas (ocultas) para no perder su estado al alternar.
+  const [visitedTabs, setVisitedTabs] = useState<Set<string>>(
+    () => new Set(["timer"]),
+  );
+  const loadProjects = useAppStore((s) => s.loadProjects);
+  const loadAccounts = useAppStore((s) => s.loadAccounts);
   const { theme, toggleTheme } = useTheme();
 
-  const refresh = () => setRefreshFlag((v) => v + 1);
+  useEffect(() => {
+    loadProjects();
+    loadAccounts();
+  }, [loadProjects, loadAccounts]);
 
   useEffect(() => {
-    window.api.db.listProjects().then(setProjects);
-    window.api.db.listAccounts().then(setAccounts);
-  }, [refreshFlag]);
-
-  const renderTab = () => {
-    switch (activeTab) {
-      case "timer":
-        return <Timer projects={projects} onSessionChange={refresh} />;
-      case "projects":
-        return (
-          <Projects
-            projects={projects}
-            accounts={accounts}
-            onChange={refresh}
-          />
-        );
-      case "accounts":
-        return <Accounts accounts={accounts} onChange={refresh} />;
-      case "activity":
-        return <Activity projects={projects} />;
-      case "reports":
-        return <Reports projects={projects} />;
-      default:
-        return null;
-    }
-  };
+    setVisitedTabs((prev) =>
+      prev.has(activeTab) ? prev : new Set(prev).add(activeTab),
+    );
+  }, [activeTab]);
 
   return (
-    <div className="min-h-screen bg-[var(--color-bg-light)] dark:bg-[var(--color-bg-dark)] text-[var(--color-text-light)] dark:text-[var(--color-text-dark)] transition-colors">
+    <div className="min-h-screen bg-bg-light dark:bg-bg-dark text-text-light dark:text-text-dark transition-colors">
       <div className="max-w-4xl mx-auto p-5">
         <div className="flex justify-between items-center mb-5">
           <div>
             <h1 className="text-2xl font-semibold">Work Tracker</h1>
-            <p className="text-sm text-[var(--color-text-muted-light)] dark:text-[var(--color-text-muted-dark)]">
+            <p className="text-sm text-text-muted-light dark:text-text-muted-dark">
               Registro de horas y actividad de GitHub
             </p>
           </div>
@@ -111,7 +104,7 @@ export default function App() {
         </div>
 
         <div
-          className="flex gap-2 mb-5 border-b border-[var(--color-border-light)] dark:border-[var(--color-border-dark)] pb-2"
+          className="flex gap-2 mb-5 border-b border-border-light dark:border-border-dark pb-2"
           role="tablist"
         >
           {TABS.map((tab) => (
@@ -121,8 +114,8 @@ export default function App() {
               aria-selected={activeTab === tab.id}
               className={`flex items-center gap-2 px-4 py-2 rounded-t-md text-sm transition-colors ${
                 activeTab === tab.id
-                  ? "bg-[var(--color-surface-muted-light)] dark:bg-[var(--color-surface-muted-dark)] text-[var(--color-primary)] font-medium border-b-2 border-[var(--color-primary)]"
-                  : "text-[var(--color-text-muted-light)] dark:text-[var(--color-text-muted-dark)] hover:text-[var(--color-text-light)] dark:hover:text-[var(--color-text-dark)] border-b-2 border-transparent"
+                  ? "bg-surface-muted-light dark:bg-surface-muted-dark text-primary font-medium border-b-2 border-primary"
+                  : "text-text-muted-light dark:text-text-muted-dark hover:text-text-light dark:hover:text-text-dark border-b-2 border-transparent"
               }`}
               onClick={() => setActiveTab(tab.id)}
             >
@@ -132,9 +125,14 @@ export default function App() {
           ))}
         </div>
 
-        <div key={activeTab} className="animate-fade-in">
-          {renderTab()}
-        </div>
+        {TABS.filter((tab) => visitedTabs.has(tab.id)).map((tab) => (
+          <div
+            key={tab.id}
+            className={activeTab === tab.id ? "animate-fade-in" : "hidden"}
+          >
+            {TAB_CONTENT[tab.id]()}
+          </div>
+        ))}
       </div>
     </div>
   );
