@@ -254,6 +254,25 @@ describe("GitHubService.getUserActivity", () => {
     ).toHaveLength(1);
   });
 
+  it("forceRefresh ignora la caché y vuelve a descargar", async () => {
+    const params = {
+      accountId: 1,
+      repo: "acme/widgets",
+      since: SINCE,
+      until: UNTIL,
+    };
+
+    await service.getUserActivity(params);
+    await service.getUserActivity({ ...params, forceRefresh: true });
+
+    // Dos descargas de search: la inicial y la forzada
+    expect(
+      mocks.paginate.mock.calls.filter(
+        ([fn]) => fn === mocks.searchIssuesAndPullRequests,
+      ),
+    ).toHaveLength(2);
+  });
+
   it("rechaza un formato de repo inválido", async () => {
     await expect(
       service.getUserActivity({

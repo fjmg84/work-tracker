@@ -64,10 +64,13 @@ export class GitHubService {
     repo,
     since,
     until,
+    forceRefresh,
   }: UserActivityParams): Promise<GitHubActivity> {
     const cacheKey = `${accountId}|${repo}|${since}|${until}`;
-    const cached = this.activityCache.get(cacheKey);
-    if (cached && cached.expires > Date.now()) return cached.value;
+    if (!forceRefresh) {
+      const cached = this.activityCache.get(cacheKey);
+      if (cached && cached.expires > Date.now()) return cached.value;
+    }
 
     const ctx = this.getContext(accountId, repo);
     const prs = await this.listUserPrs(ctx, since, until);
@@ -201,7 +204,10 @@ export class GitHubService {
     repo,
     since,
     until,
-  }: UserActivityParams): Promise<{ commits: CommitInfo[]; diffs: FileDiff[] }> {
+  }: UserActivityParams): Promise<{
+    commits: CommitInfo[];
+    diffs: FileDiff[];
+  }> {
     const ctx = this.getContext(accountId, repo);
     const { octokit, owner, repoName, username } = ctx;
 

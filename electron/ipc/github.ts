@@ -2,16 +2,29 @@ import { ipcMain } from "electron";
 import type { GitHubService } from "../services/github";
 import { validateGitHubToken } from "../services/github";
 import { IPC } from "../shared/contract";
-import { assertId, assertRepo, assertString, assertTimestamp } from "./validate";
+import {
+  assertId,
+  assertRepo,
+  assertString,
+  assertTimestamp,
+  optionalBoolean,
+} from "./validate";
 
 export function registerGitHubHandlers(github: GitHubService): void {
   ipcMain.handle(IPC.github.getUserActivity, (_, payload) => {
-    const { accountId, repo, since, until } = payload ?? {};
+    const { accountId, repo, since, until, forceRefresh } = payload ?? {};
     assertId(accountId, "accountId");
     assertRepo(repo, "repo");
     assertTimestamp(since, "since");
     assertTimestamp(until, "until");
-    return github.getUserActivity({ accountId, repo, since, until });
+    optionalBoolean(forceRefresh, "forceRefresh");
+    return github.getUserActivity({
+      accountId,
+      repo,
+      since,
+      until,
+      forceRefresh,
+    });
   });
 
   ipcMain.handle(IPC.github.validateToken, (_, payload) => {

@@ -150,6 +150,7 @@ export interface UserActivityParams {
   repo: string;
   since: number;
   until: number;
+  forceRefresh?: boolean;
 }
 
 export interface PrDescriptionRequest {
@@ -267,7 +268,10 @@ export interface GitHubApi {
   getCommitDiffs: (
     data: UserActivityParams,
   ) => Promise<{ commits: CommitInfo[]; diffs: FileDiff[] }>;
-  getBranches: (data: { accountId: number; repo: string }) => Promise<BranchInfo[]>;
+  getBranches: (data: {
+    accountId: number;
+    repo: string;
+  }) => Promise<BranchInfo[]>;
   getBranchChanges: (data: {
     accountId: number;
     repo: string;
@@ -276,8 +280,12 @@ export interface GitHubApi {
 }
 
 export interface AiApi {
-  generatePrDescription: (data: PrDescriptionRequest) => Promise<PrDescriptionResponse>;
-  generatePrDescriptionFromPr: (data: PrDescriptionFromPrRequest) => Promise<PrDescriptionResponse>;
+  generatePrDescription: (
+    data: PrDescriptionRequest,
+  ) => Promise<PrDescriptionResponse>;
+  generatePrDescriptionFromPr: (
+    data: PrDescriptionFromPrRequest,
+  ) => Promise<PrDescriptionResponse>;
   generatePrDescriptionFromBranch: (
     data: PrDescriptionFromBranchRequest,
   ) => Promise<PrDescriptionResponse & { branch: string }>;
@@ -288,7 +296,9 @@ export interface AiApi {
 
 export interface AppApi {
   exportCsv: (data: { filePath: string; content: string }) => Promise<boolean>;
-  showSaveDialog: (options: { defaultPath: string }) => Promise<ElectronSaveDialogResult>;
+  showSaveDialog: (options: {
+    defaultPath: string;
+  }) => Promise<ElectronSaveDialogResult>;
 }
 
 export interface Api {

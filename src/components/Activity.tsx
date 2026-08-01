@@ -63,11 +63,13 @@ export default function Activity() {
 
       const results = await Promise.allSettled(
         projects.map(async (project) => {
+          // Acción explícita del usuario: ignorar la caché del main
           const { prs } = await window.api.github.getUserActivity({
             accountId: project.account_id,
             repo: project.repo,
             since: start,
             until: end,
+            forceRefresh: true,
           });
           return prs.map((pr) => ({
             ...pr,

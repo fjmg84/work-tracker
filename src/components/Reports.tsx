@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { generateReport } from "../lib/csv";
 import { Session, PullRequest, Commit } from "../types";
 import MonthYearSelector from "./MonthYearSelector";
@@ -29,6 +29,8 @@ export default function Reports() {
     commits: ReportCommit[];
   }>({ prs: [], commits: [] });
   const [loadingActivity, setLoadingActivity] = useState<boolean>(false);
+  const [activityRefreshTick, setActivityRefreshTick] = useState<number>(0);
+  const forceNextFetch = useRef<boolean>(false);
 
   const monthRange = useMemo(
     () => ({
@@ -48,12 +50,15 @@ export default function Reports() {
 
   // Actividad de GitHub: red. Solo se carga al cambiar de mes o de proyectos,
   // en paralelo; el proceso main la cachea con TTL. Los checkboxes de
-  // proyectos filtran en memoria sin llamadas de red.
+  // proyectos filtran en memoria sin llamadas de red. El botón de refresco
+  // fuerza una descarga nueva ignorando la caché.
   useEffect(() => {
     if (projects.length === 0) {
       setActivity({ prs: [], commits: [] });
       return;
     }
+    const force = forceNextFetch.current;
+    forceNextFetch.current = false;
     let cancelled = false;
     setLoadingActivity(true);
 
@@ -64,6 +69,7 @@ export default function Reports() {
           repo: project.repo,
           since: monthRange.start,
           until: monthRange.end,
+          forceRefresh: force,
         });
         return { project, prs };
       }),
@@ -108,7 +114,7 @@ export default function Reports() {
     return () => {
       cancelled = true;
     };
-  }, [monthRange, projects]);
+  }, [monthRange, projects, activityRefreshTick]);
 
   // selectedProjects === [] significa "todos"
   const sessions = useMemo(
@@ -230,14 +236,28 @@ export default function Reports() {
             ))}
           </div>
         </div>
-        <div className="flex-1">
+        <div className="flex-1 flex gap-2">
           <button
-            className="btn btn-primary w-full flex items-center justify-center gap-2"
+            className="btn btn-primary flex-1 flex items-center justify-center gap-2"
             onClick={exportCsv}
             disabled={projects.length === 0}
           >
             <Download className="w-4 h-4" />
             Exportar CSV
+          </button>
+          <button
+            className="btn btn-secondary flex items-center justify-center"
+            onClick={() => {
+              forceNextFetch.current = true;
+              setActivityRefreshTick((t) => t + 1);
+            }}
+            disabled={projects.length === 0 || loadingActivity}
+            title="Actualizar actividad de GitHub"
+            aria-label="Actualizar actividad de GitHub"
+          >
+            <RefreshCw
+              className={`w-4 h-4 ${loadingActivity ? "animate-spin" : ""}`}
+            />
           </button>
         </div>
       </div>
