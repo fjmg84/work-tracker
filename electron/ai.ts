@@ -1,26 +1,12 @@
 import { app } from "electron";
 import fs from "fs";
 import path from "path";
-
-export type Language = "es" | "en";
-
-interface AiProviderConfig {
-  apiKey: string;
-  model: string;
-}
-
-interface CommitInfo {
-  sha: string;
-  message: string;
-  date: string;
-}
-
-interface FileDiff {
-  filename: string;
-  patch: string;
-  additions: number;
-  deletions: number;
-}
+import type {
+  AiProviderConfig,
+  CommitInfo,
+  FileDiff,
+  Language,
+} from "./shared/contract";
 
 interface GeneratePrDescriptionParams {
   commits: CommitInfo[];
@@ -101,8 +87,7 @@ export async function generatePrDescription({
 
   const diffsText = diffs
     .map(
-      (d) =>
-        `--- ${d.filename} (+${d.additions} -${d.deletions})\n${d.patch}`,
+      (d) => `--- ${d.filename} (+${d.additions} -${d.deletions})\n${d.patch}`,
     )
     .join("\n\n");
 
@@ -137,9 +122,7 @@ export async function generatePrDescription({
 
   if (!response.ok) {
     const errorText = await response.text();
-    throw new Error(
-      `Error de OpenRouter (${response.status}): ${errorText}`,
-    );
+    throw new Error(`Error de OpenRouter (${response.status}): ${errorText}`);
   }
 
   const data: any = await response.json();

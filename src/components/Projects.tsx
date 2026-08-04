@@ -1,19 +1,13 @@
 import { useState } from "react";
-import { Project, Account, ProjectInput } from "../types";
+import { Project, ProjectInput } from "../types";
 import { Pencil, Trash2, Plus, FolderGit2 } from "lucide-react";
 import { toast } from "sonner";
+import { useAppStore } from "../store/appStore";
 
-interface ProjectsProps {
-  projects: Project[];
-  accounts: Account[];
-  onChange: () => void;
-}
-
-export default function Projects({
-  projects,
-  accounts,
-  onChange,
-}: ProjectsProps) {
+export default function Projects() {
+  const projects = useAppStore((s) => s.projects);
+  const accounts = useAppStore((s) => s.accounts);
+  const loadProjects = useAppStore((s) => s.loadProjects);
   const [editing, setEditing] = useState<ProjectInput | null>(null);
   const [name, setName] = useState<string>("");
   const [repo, setRepo] = useState<string>("");
@@ -57,7 +51,7 @@ export default function Projects({
       });
     }
     reset();
-    onChange();
+    await loadProjects();
   };
 
   const remove = async (id: number) => {
@@ -66,7 +60,7 @@ export default function Projects({
         label: "Eliminar",
         onClick: async () => {
           await window.api.db.deleteProject(id);
-          onChange();
+          await loadProjects();
           toast.success("Proyecto eliminado");
         },
       },
@@ -79,15 +73,15 @@ export default function Projects({
 
   return (
     <div className="card">
-      <h3 className="text-base font-medium text-[var(--color-text-light)] dark:text-[var(--color-text-dark)] mb-3">
+      <h3 className="text-base font-medium text-text-light dark:text-text-dark mb-3">
         Proyectos
       </h3>
 
       <ul className="list-none mb-3">
         {projects.length === 0 && (
           <li className="text-center py-8">
-            <FolderGit2 className="w-12 h-12 mx-auto text-[var(--color-text-muted-light)] dark:text-[var(--color-text-muted-dark)] mb-3" />
-            <p className="text-[var(--color-text-muted-light)] dark:text-[var(--color-text-muted-dark)]">
+            <FolderGit2 className="w-12 h-12 mx-auto text-text-muted-light dark:text-text-muted-dark mb-3" />
+            <p className="text-text-muted-light dark:text-text-muted-dark">
               No hay proyectos registrados.
             </p>
           </li>
@@ -95,13 +89,13 @@ export default function Projects({
         {projects.map((p) => (
           <li
             key={p.id}
-            className="flex justify-between items-center py-3 border-b border-[var(--color-border-light)] dark:border-[var(--color-border-dark)] last:border-b-0 hover:bg-[var(--color-surface-muted-light)] dark:hover:bg-[var(--color-surface-muted-dark)] transition-colors rounded-md px-2 -mx-2"
+            className="flex justify-between items-center py-3 border-b border-border-light dark:border-border-dark last:border-b-0 hover:bg-surface-muted-light dark:hover:bg-surface-muted-dark transition-colors rounded-md px-2 -mx-2"
           >
             <div>
-              <strong className="text-[var(--color-text-light)] dark:text-[var(--color-text-dark)]">
+              <strong className="text-text-light dark:text-text-dark">
                 {p.name}
               </strong>
-              <div className="text-sm text-[var(--color-text-muted-light)] dark:text-[var(--color-text-muted-dark)]">
+              <div className="text-sm text-text-muted-light dark:text-text-muted-dark">
                 {p.repo} · {p.account_label} (@{p.account_username})
               </div>
             </div>
@@ -139,7 +133,7 @@ export default function Projects({
         <form onSubmit={save} className="mt-3">
           <div className="flex gap-3 mb-3 items-end">
             <div className="flex-1">
-              <label className="block text-sm text-[var(--color-text-muted-light)] dark:text-[var(--color-text-muted-dark)] mb-1">
+              <label className="block text-sm text-text-muted-light dark:text-text-muted-dark mb-1">
                 Nombre del proyecto
               </label>
               <input
@@ -150,7 +144,7 @@ export default function Projects({
               />
             </div>
             <div className="flex-1">
-              <label className="block text-sm text-[var(--color-text-muted-light)] dark:text-[var(--color-text-muted-dark)] mb-1">
+              <label className="block text-sm text-text-muted-light dark:text-text-muted-dark mb-1">
                 Repositorio (organización/repo)
               </label>
               <input
@@ -164,7 +158,7 @@ export default function Projects({
           </div>
           <div className="flex gap-3 mb-3 items-end">
             <div className="flex-1">
-              <label className="block text-sm text-[var(--color-text-muted-light)] dark:text-[var(--color-text-muted-dark)] mb-1">
+              <label className="block text-sm text-text-muted-light dark:text-text-muted-dark mb-1">
                 Cuenta de GitHub
               </label>
               <select
@@ -194,7 +188,7 @@ export default function Projects({
       )}
 
       {!accounts.length && (
-        <p className="text-sm text-[var(--color-text-muted-light)] dark:text-[var(--color-text-muted-dark)] mt-3">
+        <p className="text-sm text-text-muted-light dark:text-text-muted-dark mt-3">
           Primero debes agregar al menos una cuenta de GitHub.
         </p>
       )}

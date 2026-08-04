@@ -1,12 +1,8 @@
-import { useState } from "react";
-import {
-  Project,
-  GitHubActivity,
-  PullRequest,
-  GitHubActivityError,
-} from "../types";
+import { useMemo, useState } from "react";
+import { GitHubActivity, PullRequest, GitHubActivityError } from "../types";
 import MonthYearSelector from "./MonthYearSelector";
 import PrDescriptionModal from "./PrDescriptionModal";
+import { useAppStore } from "../store/appStore";
 import {
   ChevronRight,
   ChevronDown,
@@ -18,11 +14,8 @@ import {
   Sparkles,
 } from "lucide-react";
 
-interface ActivityProps {
-  projects: Project[];
-}
-
-export default function Activity({ projects }: ActivityProps) {
+export default function Activity() {
+  const projects = useAppStore((s) => s.projects);
   const [year, setYear] = useState<number>(new Date().getFullYear());
   const [month, setMonth] = useState<number>(new Date().getMonth() + 1);
   const [loading, setLoading] = useState<boolean>(false);
@@ -68,33 +61,40 @@ export default function Activity({ projects }: ActivityProps) {
       const start = new Date(year, month - 1, 1).getTime();
       const end = new Date(year, month, 0, 23, 59, 59, 999).getTime();
 
-      const allPrs: (PullRequest | GitHubActivityError)[] = [];
-
-      for (const project of projects) {
-        try {
+      const results = await Promise.allSettled(
+        projects.map(async (project) => {
+          // Acción explícita del usuario: ignorar la caché del main
           const { prs } = await window.api.github.getUserActivity({
             accountId: project.account_id,
             repo: project.repo,
             since: start,
             until: end,
+            forceRefresh: true,
           });
-
-          allPrs.push(
-            ...prs.map((pr) => ({
-              ...pr,
-              projectName: project.name,
-              accountLabel: project.account_label,
-            })),
-          );
-        } catch (err) {
-          console.error(`Error cargando ${project.repo}:`, err);
-          allPrs.push({
-            error: true,
+          return prs.map((pr) => ({
+            ...pr,
             projectName: project.name,
-            message: (err as Error).message,
-          });
-        }
-      }
+            accountLabel: project.account_label,
+          }));
+        }),
+      );
+
+      const allPrs: (PullRequest | GitHubActivityError)[] = results.flatMap(
+        (result, i): (PullRequest | GitHubActivityError)[] => {
+          if (result.status === "fulfilled") return result.value;
+          console.error(`Error cargando ${projects[i].repo}:`, result.reason);
+          return [
+            {
+              error: true as const,
+              projectName: projects[i].name,
+              message:
+                result.reason instanceof Error
+                  ? result.reason.message
+                  : String(result.reason),
+            },
+          ];
+        },
+      );
 
       setResult({ prs: allPrs as PullRequest[] });
     } catch (err) {
@@ -112,19 +112,21 @@ export default function Activity({ projects }: ActivityProps) {
   );
 
   // Group PRs by repository
-  const groupedByRepo = new Map<string, PullRequest[]>();
-
-  prsWithoutError.forEach((pr) => {
-    const repo = `${pr.accountLabel}/${pr.html_url.split("/")[3]}/${pr.html_url.split("/")[4]}`;
-    if (!groupedByRepo.has(repo)) {
-      groupedByRepo.set(repo, []);
-    }
-    groupedByRepo.get(repo)!.push(pr);
-  });
+  const groupedByRepo = useMemo(() => {
+    const groups = new Map<string, PullRequest[]>();
+    prsWithoutError.forEach((pr) => {
+      const repo = `${pr.accountLabel}/${pr.html_url.split("/")[3]}/${pr.html_url.split("/")[4]}`;
+      if (!groups.has(repo)) {
+        groups.set(repo, []);
+      }
+      groups.get(repo)!.push(pr);
+    });
+    return groups;
+  }, [result]);
 
   return (
     <div className="card">
-      <h3 className="text-base font-medium text-[var(--color-text-light)] dark:text-[var(--color-text-dark)] mb-3">
+      <h3 className="text-base font-medium text-text-light dark:text-text-dark mb-3">
         Actividad de GitHub
       </h3>
 
@@ -157,7 +159,7 @@ export default function Activity({ projects }: ActivityProps) {
       </div>
 
       {error && (
-        <div className="flex items-center gap-2 text-sm text-[var(--color-danger)]">
+        <div className="flex items-center gap-2 text-sm text-danger">
           <AlertCircle className="w-4 h-4" />
           {error}
         </div>
@@ -166,10 +168,7 @@ export default function Activity({ projects }: ActivityProps) {
       {errors.length > 0 && (
         <div className="mt-3">
           {errors.map((e, i) => (
-            <p
-              key={i}
-              className="text-sm text-[var(--color-danger)] flex items-center gap-2"
-            >
+            <p key={i} className="text-sm text-danger flex items-center gap-2">
               <AlertCircle className="w-4 h-4" />
               Error en {e.projectName}: {e.message}
             </p>
@@ -181,8 +180,8 @@ export default function Activity({ projects }: ActivityProps) {
         <>
           {groupedByRepo.size === 0 ? (
             <div className="text-center py-8">
-              <ActivityIcon className="w-12 h-12 mx-auto text-[var(--color-text-muted-light)] dark:text-[var(--color-text-muted-dark)] mb-3" />
-              <p className="text-[var(--color-text-muted-light)] dark:text-[var(--color-text-muted-dark)]">
+              <ActivityIcon className="w-12 h-12 mx-auto text-text-muted-light dark:text-text-muted-dark mb-3" />
+              <p className="text-text-muted-light dark:text-text-muted-dark">
                 No se encontraron PRs.
               </p>
             </div>
@@ -190,7 +189,7 @@ export default function Activity({ projects }: ActivityProps) {
             Array.from(groupedByRepo.entries()).map(([repo, prs]) => (
               <div key={repo} className="mt-3">
                 <h4
-                  className="text-sm font-medium cursor-pointer select-none text-[var(--color-text-light)] dark:text-[var(--color-text-dark)] hover:text-[var(--color-primary)] flex items-center gap-2"
+                  className="text-sm font-medium cursor-pointer select-none text-text-light dark:text-text-dark hover:text-primary flex items-center gap-2"
                   onClick={() => toggleRepo(repo)}
                 >
                   {openRepos.has(repo) ? (
@@ -204,25 +203,25 @@ export default function Activity({ projects }: ActivityProps) {
                 {openRepos.has(repo) && (
                   <>
                     {prs.length === 0 ? (
-                      <p className="text-[var(--color-text-muted-light)] dark:text-[var(--color-text-muted-dark)] text-center py-5 italic">
+                      <p className="text-text-muted-light dark:text-text-muted-dark text-center py-5 italic">
                         No se encontraron PRs.
                       </p>
                     ) : (
                       prs.map((pr) => (
                         <div key={pr.id} className="mt-3">
-                          <div className="py-2 border-b border-[var(--color-border-light)] dark:border-[var(--color-border-dark)] last:border-b-0">
+                          <div className="py-2 border-b border-border-light dark:border-border-dark last:border-b-0">
                             <div className="flex items-start gap-2">
-                              <GitPullRequest className="w-4 h-4 mt-0.5 text-[var(--color-primary)]" />
+                              <GitPullRequest className="w-4 h-4 mt-0.5 text-primary" />
                               <div className="flex-1">
                                 <a
                                   href={pr.html_url}
                                   target="_blank"
                                   rel="noreferrer"
-                                  className="text-[var(--color-primary)] font-semibold no-underline hover:underline"
+                                  className="text-primary font-semibold no-underline hover:underline"
                                 >
                                   #{pr.number} {pr.title}
                                 </a>
-                                <div className="text-xs text-[var(--color-text-muted-light)] dark:text-[var(--color-text-muted-dark)] mt-0.5 flex items-center gap-2">
+                                <div className="text-xs text-text-muted-light dark:text-text-muted-dark mt-0.5 flex items-center gap-2">
                                   {new Date(pr.created_at).toLocaleDateString(
                                     "es-ES",
                                   )}{" "}
@@ -257,28 +256,28 @@ export default function Activity({ projects }: ActivityProps) {
 
                           {pr.commits && pr.commits.length > 0 && (
                             <div className="mt-2 ml-5">
-                              <h6 className="text-sm font-medium text-[var(--color-text-light)] dark:text-[var(--color-text-dark)] flex items-center gap-2">
+                              <h6 className="text-sm font-medium text-text-light dark:text-text-dark flex items-center gap-2">
                                 <GitCommit className="w-4 h-4" />
                                 Commits ({pr.commits.length})
                               </h6>
                               {pr.commits.map((c) => (
                                 <div
                                   key={c.sha}
-                                  className="py-2 border-b border-[var(--color-border-light)] dark:border-[var(--color-border-dark)] last:border-b-0"
+                                  className="py-2 border-b border-border-light dark:border-border-dark last:border-b-0"
                                 >
                                   <div className="flex items-start gap-2">
-                                    <GitCommit className="w-4 h-4 mt-0.5 text-[var(--color-text-muted-light)] dark:text-[var(--color-text-muted-dark)]" />
+                                    <GitCommit className="w-4 h-4 mt-0.5 text-text-muted-light dark:text-text-muted-dark" />
                                     <div className="flex-1">
                                       <a
                                         href={c.html_url}
                                         target="_blank"
                                         rel="noreferrer"
-                                        className="text-[var(--color-primary)] font-semibold no-underline hover:underline"
+                                        className="text-primary font-semibold no-underline hover:underline"
                                       >
                                         {c.sha.substring(0, 7)}
                                       </a>{" "}
                                       {c.message}
-                                      <div className="text-xs text-[var(--color-text-muted-light)] dark:text-[var(--color-text-muted-dark)] mt-0.5">
+                                      <div className="text-xs text-text-muted-light dark:text-text-muted-dark mt-0.5">
                                         {new Date(c.date).toLocaleDateString(
                                           "es-ES",
                                         )}

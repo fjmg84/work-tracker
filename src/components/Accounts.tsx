@@ -2,13 +2,12 @@ import { FormEvent, useState } from "react";
 import { Account } from "../types";
 import { Pencil, Trash2, Plus, Key } from "lucide-react";
 import { toast } from "sonner";
+import { useAppStore } from "../store/appStore";
 
-interface AccountsProps {
-  accounts: Account[];
-  onChange: () => void;
-}
-
-export default function Accounts({ accounts, onChange }: AccountsProps) {
+export default function Accounts() {
+  const accounts = useAppStore((s) => s.accounts);
+  const loadAccounts = useAppStore((s) => s.loadAccounts);
+  const loadProjects = useAppStore((s) => s.loadProjects);
   const [editing, setEditing] = useState<Account | null>(null);
   const [label, setLabel] = useState<string>("");
   const [username, setUsername] = useState<string>("");
@@ -78,7 +77,8 @@ export default function Accounts({ accounts, onChange }: AccountsProps) {
       toast.success("Cuenta creada");
     }
     reset();
-    onChange();
+    await loadAccounts();
+    await loadProjects();
   };
 
   const remove = async (id: number) => {
@@ -89,7 +89,8 @@ export default function Accounts({ accounts, onChange }: AccountsProps) {
           label: "Eliminar",
           onClick: async () => {
             await window.api.db.deleteAccount(id);
-            onChange();
+            await loadAccounts();
+            await loadProjects();
             toast.success("Cuenta eliminada");
           },
         },
@@ -103,15 +104,15 @@ export default function Accounts({ accounts, onChange }: AccountsProps) {
 
   return (
     <div className="card">
-      <h3 className="text-base font-medium text-[var(--color-text-light)] dark:text-[var(--color-text-dark)] mb-3">
+      <h3 className="text-base font-medium text-text-light dark:text-text-dark mb-3">
         Cuentas de GitHub
       </h3>
 
       <ul className="list-none mb-3">
         {accounts.length === 0 && (
           <li className="text-center py-8">
-            <Key className="w-12 h-12 mx-auto text-[var(--color-text-muted-light)] dark:text-[var(--color-text-muted-dark)] mb-3" />
-            <p className="text-[var(--color-text-muted-light)] dark:text-[var(--color-text-muted-dark)]">
+            <Key className="w-12 h-12 mx-auto text-text-muted-light dark:text-text-muted-dark mb-3" />
+            <p className="text-text-muted-light dark:text-text-muted-dark">
               No hay cuentas registradas.
             </p>
           </li>
@@ -119,13 +120,13 @@ export default function Accounts({ accounts, onChange }: AccountsProps) {
         {accounts.map((a) => (
           <li
             key={a.id}
-            className="flex justify-between items-center py-3 border-b border-[var(--color-border-light)] dark:border-[var(--color-border-dark)] last:border-b-0 hover:bg-[var(--color-surface-muted-light)] dark:hover:bg-[var(--color-surface-muted-dark)] transition-colors rounded-md px-2 -mx-2"
+            className="flex justify-between items-center py-3 border-b border-border-light dark:border-border-dark last:border-b-0 hover:bg-surface-muted-light dark:hover:bg-surface-muted-dark transition-colors rounded-md px-2 -mx-2"
           >
             <div>
-              <strong className="text-[var(--color-text-light)] dark:text-[var(--color-text-dark)]">
+              <strong className="text-text-light dark:text-text-dark">
                 {a.label}
               </strong>
-              <div className="text-sm text-[var(--color-text-muted-light)] dark:text-[var(--color-text-muted-dark)]">
+              <div className="text-sm text-text-muted-light dark:text-text-muted-dark">
                 @{a.username}
               </div>
             </div>
@@ -163,7 +164,7 @@ export default function Accounts({ accounts, onChange }: AccountsProps) {
         <form onSubmit={save} className="mt-3">
           <div className="flex gap-3 mb-3 items-end">
             <div className="flex-1">
-              <label className="block text-sm text-[var(--color-text-muted-light)] dark:text-[var(--color-text-muted-dark)] mb-1">
+              <label className="block text-sm text-text-muted-light dark:text-text-muted-dark mb-1">
                 Etiqueta (ej. Trabajo, Personal)
               </label>
               <input
@@ -174,7 +175,7 @@ export default function Accounts({ accounts, onChange }: AccountsProps) {
               />
             </div>
             <div className="flex-1">
-              <label className="block text-sm text-[var(--color-text-muted-light)] dark:text-[var(--color-text-muted-dark)] mb-1">
+              <label className="block text-sm text-text-muted-light dark:text-text-muted-dark mb-1">
                 Usuario de GitHub
               </label>
               <input
@@ -187,7 +188,7 @@ export default function Accounts({ accounts, onChange }: AccountsProps) {
           </div>
           <div className="flex gap-3 mb-3 items-end">
             <div className="flex-1">
-              <label className="block text-sm text-[var(--color-text-muted-light)] dark:text-[var(--color-text-muted-dark)] mb-1">
+              <label className="block text-sm text-text-muted-light dark:text-text-muted-dark mb-1">
                 Token de acceso personal{" "}
                 {editing.id && "(dejar en blanco para mantener el actual)"}
               </label>
@@ -212,15 +213,15 @@ export default function Accounts({ accounts, onChange }: AccountsProps) {
         </form>
       )}
 
-      <p className="text-sm text-[var(--color-text-muted-light)] dark:text-[var(--color-text-muted-dark)] mt-3">
+      <p className="text-sm text-text-muted-light dark:text-text-muted-dark mt-3">
         Crea un token en GitHub → Settings → Developer settings → Personal
         access tokens → Tokens (classic). Necesita permisos de lectura de
         repositorios (
-        <code className="bg-[var(--color-surface-muted-light)] dark:bg-[var(--color-surface-muted-dark)] px-1 rounded">
+        <code className="bg-surface-muted-light dark:bg-surface-muted-dark px-1 rounded">
           repo
         </code>{" "}
         o{" "}
-        <code className="bg-[var(--color-surface-muted-light)] dark:bg-[var(--color-surface-muted-dark)] px-1 rounded">
+        <code className="bg-surface-muted-light dark:bg-surface-muted-dark px-1 rounded">
           public_repo
         </code>{" "}
         según corresponda).

@@ -1,5 +1,5 @@
-import { useState, useEffect, useRef } from "react";
-import { Project, Session } from "../types";
+import { useState, useEffect } from "react";
+import { Session } from "../types";
 import {
   Play,
   Square,
@@ -10,27 +10,16 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import PrDescriptionModal from "./PrDescriptionModal";
+import TimerDisplay, { formatElapsed } from "./TimerDisplay";
+import { useAppStore } from "../store/appStore";
 
-interface TimerProps {
-  projects: Project[];
-  onSessionChange: () => void;
-}
-
-function formatElapsed(ms: number): string {
-  const totalSeconds = Math.floor(ms / 1000);
-  const h = Math.floor(totalSeconds / 3600);
-  const m = Math.floor((totalSeconds % 3600) / 60);
-  const s = totalSeconds % 60;
-  return `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`;
-}
-
-export default function Timer({ projects, onSessionChange }: TimerProps) {
+export default function Timer() {
+  const projects = useAppStore((s) => s.projects);
+  const bumpSessionsVersion = useAppStore((s) => s.bumpSessionsVersion);
   const [selectedProjectId, setSelectedProjectId] = useState<string>("");
   const [activeSession, setActiveSession] = useState<Session | null>(null);
-  const [elapsed, setElapsed] = useState<number>(0);
   const [notes, setNotes] = useState<string>("");
   const [loading, setLoading] = useState<boolean>(true);
-  const intervalRef = useRef<NodeJS.Timeout | null>(null);
   const [staleSessions, setStaleSessions] = useState<Session[]>([]);
   const [showPrModal, setShowPrModal] = useState<boolean>(false);
   const [stoppedSession, setStoppedSession] = useState<{
@@ -83,31 +72,6 @@ export default function Timer({ projects, onSessionChange }: TimerProps) {
     };
   }, []);
 
-  useEffect(() => {
-    if (activeSession && !isPaused) {
-      intervalRef.current = setInterval(() => {
-        setElapsed(
-          Date.now() - activeSession.start_time - activeSession.total_paused_ms,
-        );
-      }, 1000);
-      return () => {
-        if (intervalRef.current) clearInterval(intervalRef.current);
-      };
-    } else {
-      if (intervalRef.current) clearInterval(intervalRef.current);
-      if (activeSession && isPaused) {
-        setElapsed(
-          activeSession.paused_at! -
-            activeSession.start_time -
-            activeSession.total_paused_ms,
-        );
-      } else {
-        setElapsed(0);
-      }
-      return undefined;
-    }
-  }, [activeSession, isPaused]);
-
   const start = async () => {
     if (!selectedProjectId) return;
 
@@ -123,7 +87,7 @@ export default function Timer({ projects, onSessionChange }: TimerProps) {
       notes,
     });
     setActiveSession(session);
-    onSessionChange();
+    bumpSessionsVersion();
   };
 
   const stop = async () => {
@@ -145,7 +109,7 @@ export default function Timer({ projects, onSessionChange }: TimerProps) {
     }
     setActiveSession(null);
     setNotes("");
-    onSessionChange();
+    bumpSessionsVersion();
     const activeMs =
       (updated.end_time ?? 0) - updated.start_time - updated.total_paused_ms;
     toast.success(`Sesión guardada: ${formatElapsed(activeMs)}`);
@@ -167,7 +131,7 @@ export default function Timer({ projects, onSessionChange }: TimerProps) {
     const ids = staleSessions.map((s) => s.id);
     await window.api.db.closeStaleSessions({ ids });
     setStaleSessions([]);
-    onSessionChange();
+    bumpSessionsVersion();
     toast.success(`${ids.length} sesiones antiguas cerradas.`);
   };
 
@@ -175,7 +139,7 @@ export default function Timer({ projects, onSessionChange }: TimerProps) {
 
   return (
     <div className="card">
-      <h3 className="text-base font-medium text-[var(--color-text-light)] dark:text-[var(--color-text-dark)] mb-3">
+      <h3 className="text-base font-medium text-text-light dark:text-text-dark mb-3">
         Cronómetro
       </h3>
 
@@ -199,7 +163,7 @@ export default function Timer({ projects, onSessionChange }: TimerProps) {
 
       <div className="flex gap-3 mb-3 items-end">
         <div className="flex-1">
-          <label className="block text-sm text-[var(--color-text-muted-light)] dark:text-[var(--color-text-muted-dark)] mb-1">
+          <label className="block text-sm text-text-muted-light dark:text-text-muted-dark mb-1">
             Proyecto
           </label>
           <select
@@ -220,7 +184,7 @@ export default function Timer({ projects, onSessionChange }: TimerProps) {
 
       <div className="flex gap-3 mb-3 items-end">
         <div className="flex-1">
-          <label className="block text-sm text-[var(--color-text-muted-light)] dark:text-[var(--color-text-muted-dark)] mb-1">
+          <label className="block text-sm text-text-muted-light dark:text-text-muted-dark mb-1">
             Notas (opcional)
           </label>
           <input
@@ -234,19 +198,7 @@ export default function Timer({ projects, onSessionChange }: TimerProps) {
         </div>
       </div>
 
-      <div
-        className={`text-6xl font-bold font-variant-numeric tabular-nums text-center my-6 text-[var(--color-text-light)] dark:text-[var(--color-text-dark)] ${activeSession && !isPaused ? "animate-pulse-timer" : ""}`}
-      >
-        <div className="flex items-center justify-center gap-3">
-          <Clock className="w-8 h-8 text-[var(--color-primary)]" />
-          {formatElapsed(elapsed)}
-        </div>
-        {isPaused && (
-          <span className="mt-2 inline-block text-sm font-semibold bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-300 px-3 py-1 rounded-full">
-            Pausado
-          </span>
-        )}
-      </div>
+      <TimerDisplay session={activeSession} />
 
       <div className="flex gap-3 justify-center">
         <button
@@ -286,7 +238,7 @@ export default function Timer({ projects, onSessionChange }: TimerProps) {
       </div>
 
       {activeSession && (
-        <p className="text-sm text-[var(--color-text-muted-light)] dark:text-[var(--color-text-muted-dark)] mt-3 text-center">
+        <p className="text-sm text-text-muted-light dark:text-text-muted-dark mt-3 text-center">
           Sesión activa desde{" "}
           {new Date(activeSession.start_time).toLocaleString("es-ES")}
           {activeSession.total_paused_ms > 0 && (
@@ -300,8 +252,8 @@ export default function Timer({ projects, onSessionChange }: TimerProps) {
 
       {!projects.length && (
         <div className="text-center py-8 mt-3">
-          <Clock className="w-12 h-12 mx-auto text-[var(--color-text-muted-light)] dark:text-[var(--color-text-muted-dark)] mb-3" />
-          <p className="text-[var(--color-text-muted-light)] dark:text-[var(--color-text-muted-dark)]">
+          <Clock className="w-12 h-12 mx-auto text-text-muted-light dark:text-text-muted-dark mb-3" />
+          <p className="text-text-muted-light dark:text-text-muted-dark">
             Crea al menos un proyecto y una cuenta de GitHub para empezar.
           </p>
         </div>

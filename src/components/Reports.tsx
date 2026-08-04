@@ -1,111 +1,177 @@
-import { useState, useEffect } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { generateReport } from "../lib/csv";
-import {
-  Project,
-  Session,
-  PullRequest,
-  Commit,
-  GitHubActivityError,
-} from "../types";
+import { Session, PullRequest, Commit } from "../types";
 import MonthYearSelector from "./MonthYearSelector";
-import { Download, FileText } from "lucide-react";
+import { Download, FileText, RefreshCw } from "lucide-react";
 import { toast } from "sonner";
 import Summary from "./Summary";
 import { SummaryType } from "@/types/reports";
+import { useAppStore } from "../store/appStore";
 
-interface ReportsProps {
-  projects: Project[];
+type ReportPr = PullRequest & { projectId: number };
+type ReportCommit = Commit & { projectId: number };
+
+function sessionMinutes(s: Session): number {
+  return Math.round(
+    ((s.end_time ?? 0) - s.start_time - (s.total_paused_ms ?? 0)) / 60000,
+  );
 }
 
-export default function Reports({ projects }: ReportsProps) {
+export default function Reports() {
+  const projects = useAppStore((s) => s.projects);
+  const sessionsVersion = useAppStore((s) => s.sessionsVersion);
   const [year, setYear] = useState<number>(new Date().getFullYear());
   const [month, setMonth] = useState<number>(new Date().getMonth() + 1);
   const [selectedProjects, setSelectedProjects] = useState<number[]>([]);
   const [allSessions, setAllSessions] = useState<Session[]>([]);
-  const [sessions, setSessions] = useState<Session[]>([]);
   const [activity, setActivity] = useState<{
-    prs: PullRequest[];
-    commits: Commit[];
+    prs: ReportPr[];
+    commits: ReportCommit[];
   }>({ prs: [], commits: [] });
-  const [summary, setSummary] = useState<SummaryType | null>(null);
+  const [loadingActivity, setLoadingActivity] = useState<boolean>(false);
+  const [activityRefreshTick, setActivityRefreshTick] = useState<number>(0);
+  const forceNextFetch = useRef<boolean>(false);
 
+  const monthRange = useMemo(
+    () => ({
+      start: new Date(year, month - 1, 1).getTime(),
+      end: new Date(year, month, 0, 23, 59, 59, 999).getTime(),
+    }),
+    [year, month],
+  );
+
+  // Sesiones: SQLite local (barato). Se recarga al cambiar de mes o al
+  // guardar/cerrar sesiones (sessionsVersion).
   useEffect(() => {
-    loadData();
-  }, [year, month, projects, selectedProjects]);
+    window.api.db
+      .listSessions({ from: monthRange.start, to: monthRange.end })
+      .then(setAllSessions);
+  }, [monthRange, sessionsVersion]);
 
-  const loadData = async () => {
-    const start = new Date(year, month - 1, 1).getTime();
-    const end = new Date(year, month, 0, 23, 59, 59, 999).getTime();
+  // Actividad de GitHub: red. Solo se carga al cambiar de mes o de proyectos,
+  // en paralelo; el proceso main la cachea con TTL. Los checkboxes de
+  // proyectos filtran en memoria sin llamadas de red. El botón de refresco
+  // fuerza una descarga nueva ignorando la caché.
+  useEffect(() => {
+    if (projects.length === 0) {
+      setActivity({ prs: [], commits: [] });
+      return;
+    }
+    const force = forceNextFetch.current;
+    forceNextFetch.current = false;
+    let cancelled = false;
+    setLoadingActivity(true);
 
-    const sessionData = await window.api.db.listSessions({
-      from: start,
-      to: end,
-    });
-
-    setAllSessions(sessionData);
-
-    // ponytail: selectedProjects === [] means "all"
-    const filteredSessions = selectedProjects.length
-      ? sessionData.filter((s) => selectedProjects.includes(s.project_id))
-      : sessionData;
-    setSessions(filteredSessions);
-
-    const allPrs: (PullRequest | GitHubActivityError)[] = [];
-    const allCommits: Commit[] = [];
-
-    const projectsToLoad = selectedProjects.length
-      ? projects.filter((p) => selectedProjects.includes(p.id))
-      : projects;
-
-    for (const project of projectsToLoad) {
-      try {
+    Promise.allSettled(
+      projects.map(async (project) => {
         const { prs } = await window.api.github.getUserActivity({
           accountId: project.account_id,
           repo: project.repo,
-          since: start,
-          until: end,
+          since: monthRange.start,
+          until: monthRange.end,
+          forceRefresh: force,
         });
-        allPrs.push(
-          ...prs.map((pr) => ({
-            ...pr,
-            projectName: project.name,
-            accountLabel: project.account_label,
-          })),
-        );
-        // Extract commits from PRs (only from non-error PRs)
-        prs.forEach((pr) => {
-          if (!("error" in pr) && pr.commits) {
-            allCommits.push(
-              ...pr.commits.map((c) => ({
+        return { project, prs };
+      }),
+    )
+      .then((results) => {
+        if (cancelled) return;
+        const allPrs: ReportPr[] = [];
+        const allCommits: ReportCommit[] = [];
+        results.forEach((result, i) => {
+          if (result.status === "rejected") {
+            console.error(
+              `Error cargando actividad de ${projects[i].repo}:`,
+              result.reason,
+            );
+            return;
+          }
+          const { project, prs } = result.value;
+          prs.forEach((pr) => {
+            if ("error" in pr) return;
+            allPrs.push({
+              ...pr,
+              projectId: project.id,
+              projectName: project.name,
+              accountLabel: project.account_label,
+            });
+            pr.commits?.forEach((c) =>
+              allCommits.push({
                 ...c,
+                projectId: project.id,
                 projectName: project.name,
                 accountLabel: project.account_label,
-              })),
+              }),
             );
-          }
+          });
         });
-      } catch (err) {
-        console.error(`Error cargando actividad de ${project.repo}:`, err);
-      }
+        setActivity({ prs: allPrs, commits: allCommits });
+      })
+      .finally(() => {
+        if (!cancelled) setLoadingActivity(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [monthRange, projects, activityRefreshTick]);
+
+  // selectedProjects === [] significa "todos"
+  const sessions = useMemo(
+    () =>
+      selectedProjects.length
+        ? allSessions.filter((s) => selectedProjects.includes(s.project_id))
+        : allSessions,
+    [allSessions, selectedProjects],
+  );
+
+  const filteredPrs = useMemo(
+    () =>
+      selectedProjects.length
+        ? activity.prs.filter((pr) => selectedProjects.includes(pr.projectId))
+        : activity.prs,
+    [activity.prs, selectedProjects],
+  );
+
+  const filteredCommits = useMemo(
+    () =>
+      selectedProjects.length
+        ? activity.commits.filter((c) => selectedProjects.includes(c.projectId))
+        : activity.commits,
+    [activity.commits, selectedProjects],
+  );
+
+  const summary = useMemo<SummaryType>(() => {
+    const finished = sessions.filter((s) => s.end_time);
+    return {
+      totalMinutes: finished.reduce((acc, s) => acc + sessionMinutes(s), 0),
+      sessions: finished.length,
+      prs: filteredPrs.length,
+      commits: filteredCommits.length,
+    };
+  }, [sessions, filteredPrs, filteredCommits]);
+
+  // Solo se muestran en el filtro los proyectos con sesiones este mes
+  const activeProjects = useMemo(() => {
+    const activeProjectIds = new Set(allSessions.map((s) => s.project_id));
+    return projects.filter((p) => activeProjectIds.has(p.id));
+  }, [allSessions, projects]);
+
+  const sessionsByWeek = useMemo(() => {
+    const groups: Record<string, Record<string, Session[]>> = {};
+    for (const s of sessions) {
+      if (!s.end_time) continue;
+      const d = new Date(s.start_time);
+      const dayOfWeek = d.getDay() === 0 ? 6 : d.getDay() - 1;
+      const monday = new Date(d);
+      monday.setDate(d.getDate() - dayOfWeek);
+      const weekKey = `${monday.getFullYear()}-${String(monday.getMonth() + 1).padStart(2, "0")}-${String(monday.getDate()).padStart(2, "0")}`;
+      const dayKey = `Día ${d.getDate()}`;
+      (groups[weekKey] ??= {})[dayKey] ??= [];
+      groups[weekKey][dayKey].push(s);
     }
-
-    setActivity({
-      prs: allPrs.filter((p) => !("error" in p)) as PullRequest[],
-      commits: allCommits,
-    });
-
-    const filtered = filteredSessions.filter((s) => s.end_time);
-    const totalMinutes = filtered.reduce(
-      (acc, s) => acc + Math.round(((s.end_time ?? 0) - s.start_time - (s.total_paused_ms ?? 0)) / 60000),
-      0,
-    );
-    setSummary({
-      totalMinutes,
-      sessions: filtered.length,
-      prs: allPrs.length,
-      commits: allCommits.length,
-    });
-  };
+    return groups;
+  }, [sessions]);
 
   const exportCsv = async () => {
     const content = generateReport({
@@ -113,7 +179,7 @@ export default function Reports({ projects }: ReportsProps) {
       year,
       sessions,
       projects,
-      prs: activity.prs,
+      prs: filteredPrs,
     });
 
     const defaultPath = `reporte-${year}-${String(month).padStart(2, "0")}.csv`;
@@ -124,26 +190,9 @@ export default function Reports({ projects }: ReportsProps) {
     toast.success("CSV exportado correctamente");
   };
 
-  // ponytail: only show projects that have sessions this month
-  const activeProjectIds = new Set(allSessions.map((s) => s.project_id));
-  const activeProjects = projects.filter((p) => activeProjectIds.has(p.id));
-
-  const sessionsFiltered = sessions.filter((s) => s.end_time);
-  const sessionsByWeek: Record<string, Record<string, Session[]>> = {};
-  for (const s of sessionsFiltered) {
-    const d = new Date(s.start_time);
-    const dayOfWeek = d.getDay() === 0 ? 6 : d.getDay() - 1;
-    const monday = new Date(d);
-    monday.setDate(d.getDate() - dayOfWeek);
-    const weekKey = `${monday.getFullYear()}-${String(monday.getMonth() + 1).padStart(2, "0")}-${String(monday.getDate()).padStart(2, "0")}`;
-    const dayKey = `Día ${d.getDate()}`;
-    (sessionsByWeek[weekKey] ??= {})[dayKey] ??= [];
-    sessionsByWeek[weekKey][dayKey].push(s);
-  }
-
   return (
     <div className="card">
-      <h3 className="text-base font-medium text-[var(--color-text-light)] dark:text-[var(--color-text-dark)] mb-3">
+      <h3 className="text-base font-medium text-text-light dark:text-text-dark mb-3">
         Reporte mensual
       </h3>
 
@@ -159,7 +208,7 @@ export default function Reports({ projects }: ReportsProps) {
             <label className="flex items-center gap-2 cursor-pointer mb-1 last:mb-0">
               <input
                 type="checkbox"
-                className="accent-[var(--color-primary)]"
+                className="accent-primary"
                 checked={selectedProjects.length === 0}
                 onChange={() => setSelectedProjects([])}
               />
@@ -172,7 +221,7 @@ export default function Reports({ projects }: ReportsProps) {
               >
                 <input
                   type="checkbox"
-                  className="accent-[var(--color-primary)]"
+                  className="accent-primary"
                   checked={selectedProjects.includes(p.id)}
                   onChange={() =>
                     setSelectedProjects((prev) =>
@@ -187,30 +236,51 @@ export default function Reports({ projects }: ReportsProps) {
             ))}
           </div>
         </div>
-        <div className="flex-1">
+        <div className="flex-1 flex gap-2">
           <button
-            className="btn btn-primary w-full flex items-center justify-center gap-2"
+            className="btn btn-primary flex-1 flex items-center justify-center gap-2"
             onClick={exportCsv}
             disabled={projects.length === 0}
           >
             <Download className="w-4 h-4" />
             Exportar CSV
           </button>
+          <button
+            className="btn btn-secondary flex items-center justify-center"
+            onClick={() => {
+              forceNextFetch.current = true;
+              setActivityRefreshTick((t) => t + 1);
+            }}
+            disabled={projects.length === 0 || loadingActivity}
+            title="Actualizar actividad de GitHub"
+            aria-label="Actualizar actividad de GitHub"
+          >
+            <RefreshCw
+              className={`w-4 h-4 ${loadingActivity ? "animate-spin" : ""}`}
+            />
+          </button>
         </div>
       </div>
+
+      {loadingActivity && (
+        <p className="text-sm text-text-muted-light dark:text-text-muted-dark flex items-center gap-2 mb-3">
+          <RefreshCw className="w-4 h-4 animate-spin" />
+          Cargando actividad de GitHub...
+        </p>
+      )}
 
       <Summary summary={summary} />
 
       <div className="mt-3">
-        <h4 className="text-sm font-medium text-[var(--color-text-light)] dark:text-[var(--color-text-dark)] mb-2 flex items-center gap-2">
+        <h4 className="text-sm font-medium text-text-light dark:text-text-dark mb-2 flex items-center gap-2">
           <FileText className="w-4 h-4" />
           Sesiones del mes
         </h4>
         <ul className="list-none mt-3">
           {sessions.filter((s) => s.end_time).length === 0 && (
             <li className="text-center py-8">
-              <FileText className="w-12 h-12 mx-auto text-[var(--color-text-muted-light)] dark:text-[var(--color-text-muted-dark)] mb-3" />
-              <p className="text-[var(--color-text-muted-light)] dark:text-[var(--color-text-muted-dark)]">
+              <FileText className="w-12 h-12 mx-auto text-text-muted-light dark:text-text-muted-dark mb-3" />
+              <p className="text-text-muted-light dark:text-text-muted-dark">
                 No hay sesiones registradas en este mes.
               </p>
             </li>
@@ -220,9 +290,7 @@ export default function Reports({ projects }: ReportsProps) {
             const dayEntries = Object.entries(days).map(
               ([dayKey, daySessions]) => {
                 const dayMinutes = daySessions.reduce(
-                  (acc, s) =>
-                    acc +
-                    Math.round(((s.end_time ?? 0) - s.start_time - (s.total_paused_ms ?? 0)) / 60000),
+                  (acc, s) => acc + sessionMinutes(s),
                   0,
                 );
                 weekMinutes += dayMinutes;
@@ -234,7 +302,7 @@ export default function Reports({ projects }: ReportsProps) {
                 <ul className="list-none">
                   {dayEntries.map(({ dayKey, daySessions, dayMinutes }) => (
                     <li key={dayKey} className="mb-4">
-                      <div className="text-sm font-medium text-[var(--color-text-light)] dark:text-[var(--color-text-dark)] mb-2">
+                      <div className="text-sm font-medium text-text-light dark:text-text-dark mb-2">
                         {dayKey}
                       </div>
                       <ul className="list-none">
@@ -245,24 +313,22 @@ export default function Reports({ projects }: ReportsProps) {
                             name: "-",
                             account_label: "-",
                           };
-                          const minutes = Math.round(
-                            ((s.end_time ?? 0) - s.start_time - (s.total_paused_ms ?? 0)) / 60000,
-                          );
+                          const minutes = sessionMinutes(s);
                           return (
                             <li
                               key={s.id}
-                              className="flex justify-between py-2 border-b border-[var(--color-border-light)] dark:border-[var(--color-border-dark)] last:border-b-0"
+                              className="flex justify-between py-2 border-b border-border-light dark:border-border-dark last:border-b-0"
                             >
-                              <span className="text-[var(--color-text-light)] dark:text-[var(--color-text-dark)]">
+                              <span className="text-text-light dark:text-text-dark">
                                 {project.name}
                               </span>
-                              <span className="text-[var(--color-text-light)] dark:text-[var(--color-text-dark)]">
+                              <span className="text-text-light dark:text-text-dark">
                                 {Math.floor(minutes / 60)}h {minutes % 60}m
                               </span>
                             </li>
                           );
                         })}
-                        <li className="flex justify-between py-2 border-b border-[var(--color-border-light)] dark:border-[var(--color-border-dark)] last:border-b-0 font-medium text-[var(--color-primary)]">
+                        <li className="flex justify-between py-2 border-b border-border-light dark:border-border-dark last:border-b-0 font-medium text-primary">
                           <span>Total del día</span>
                           <span>
                             {Math.floor(dayMinutes / 60)}h {dayMinutes % 60}m
@@ -271,7 +337,7 @@ export default function Reports({ projects }: ReportsProps) {
                       </ul>
                     </li>
                   ))}
-                  <li className="flex justify-between py-2 border-b-2 border-[var(--color-primary)] font-bold text-[var(--color-primary)]">
+                  <li className="flex justify-between py-2 border-b-2 border-primary font-bold text-primary">
                     <span>Total de la semana</span>
                     <span>
                       {Math.floor(weekMinutes / 60)}h {weekMinutes % 60}m

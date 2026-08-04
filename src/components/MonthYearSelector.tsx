@@ -16,7 +16,7 @@ export default function MonthYearSelector({
   return (
     <>
       <div className="flex-1">
-        <label className="block text-sm text-[var(--color-text-muted-light)] dark:text-[var(--color-text-muted-dark)] mb-1 flex items-center gap-2">
+        <label className="block text-sm text-text-muted-light dark:text-text-muted-dark mb-1 flex items-center gap-2">
           <Calendar className="w-4 h-4" />
           Año
         </label>
@@ -29,7 +29,7 @@ export default function MonthYearSelector({
         />
       </div>
       <div className="flex-1">
-        <label className="block text-sm text-[var(--color-text-muted-light)] dark:text-[var(--color-text-muted-dark)] mb-1 flex items-center gap-2">
+        <label className="block text-sm text-text-muted-light dark:text-text-muted-dark mb-1 flex items-center gap-2">
           <CalendarDays className="w-4 h-4" />
           Mes
         </label>
