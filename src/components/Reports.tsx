@@ -157,8 +157,15 @@ export default function Reports() {
     return projects.filter((p) => activeProjectIds.has(p.id));
   }, [allSessions, projects]);
 
-  const sessionsByWeek = useMemo(() => {
-    const groups: Record<string, Record<string, Session[]>> = {};
+  const sessionsByWeekAggregated = useMemo(() => {
+    type ProjectAgg = {
+      projectId: number;
+      projectName: string;
+      accountLabel: string;
+      minutes: number;
+      count: number;
+    };
+    const groups: Record<string, Record<string, ProjectAgg[]>> = {};
     for (const s of sessions) {
       if (!s.end_time) continue;
       const d = new Date(s.start_time);
@@ -167,11 +174,34 @@ export default function Reports() {
       monday.setDate(d.getDate() - dayOfWeek);
       const weekKey = `${monday.getFullYear()}-${String(monday.getMonth() + 1).padStart(2, "0")}-${String(monday.getDate()).padStart(2, "0")}`;
       const dayKey = `Día ${d.getDate()}`;
-      (groups[weekKey] ??= {})[dayKey] ??= [];
-      groups[weekKey][dayKey].push(s);
+      const project =
+        projects.find((p) => p.id === s.project_id) ?? {
+          name: "-",
+          account_label: "-",
+        };
+      const dayBucket = (groups[weekKey] ??= {});
+      const projectBucket = dayBucket[dayKey] ??= [];
+      let agg = projectBucket.find((a) => a.projectId === s.project_id);
+      if (!agg) {
+        agg = {
+          projectId: s.project_id,
+          projectName: project.name,
+          accountLabel: project.account_label,
+          minutes: 0,
+          count: 0,
+        };
+        projectBucket.push(agg);
+      }
+      agg.minutes += sessionMinutes(s);
+      agg.count += 1;
+    }
+    for (const week of Object.values(groups)) {
+      for (const day of Object.values(week)) {
+        day.sort((a, b) => b.minutes - a.minutes);
+      }
     }
     return groups;
-  }, [sessions]);
+  }, [sessions, projects]);
 
   const exportCsv = async () => {
     const content = generateReport({
@@ -285,49 +315,45 @@ export default function Reports() {
               </p>
             </li>
           )}
-          {Object.entries(sessionsByWeek).map(([weekKey, days]) => {
+          {Object.entries(sessionsByWeekAggregated).map(([weekKey, days]) => {
             let weekMinutes = 0;
             const dayEntries = Object.entries(days).map(
-              ([dayKey, daySessions]) => {
-                const dayMinutes = daySessions.reduce(
-                  (acc, s) => acc + sessionMinutes(s),
+              ([dayKey, projectAggs]) => {
+                const dayMinutes = projectAggs.reduce(
+                  (acc, a) => acc + a.minutes,
                   0,
                 );
                 weekMinutes += dayMinutes;
-                return { dayKey, daySessions, dayMinutes };
+                return { dayKey, projectAggs, dayMinutes };
               },
             );
             return (
               <li key={weekKey} className="mb-4">
                 <ul className="list-none">
-                  {dayEntries.map(({ dayKey, daySessions, dayMinutes }) => (
+                  {dayEntries.map(({ dayKey, projectAggs, dayMinutes }) => (
                     <li key={dayKey} className="mb-4">
                       <div className="text-sm font-medium text-text-light dark:text-text-dark mb-2">
                         {dayKey}
                       </div>
                       <ul className="list-none">
-                        {daySessions.map((s) => {
-                          const project = projects.find(
-                            (p) => p.id === s.project_id,
-                          ) || {
-                            name: "-",
-                            account_label: "-",
-                          };
-                          const minutes = sessionMinutes(s);
-                          return (
-                            <li
-                              key={s.id}
-                              className="flex justify-between py-2 border-b border-border-light dark:border-border-dark last:border-b-0"
-                            >
-                              <span className="text-text-light dark:text-text-dark">
-                                {project.name}
+                        {projectAggs.map((agg) => (
+                          <li
+                            key={agg.projectId}
+                            className="flex justify-between py-2 border-b border-border-light dark:border-border-dark last:border-b-0"
+                          >
+                            <span className="text-text-light dark:text-text-dark">
+                              {agg.projectName}
+                              <span className="text-text-muted-light dark:text-text-muted-dark text-xs ml-2">
+                                ({agg.count}{" "}
+                                {agg.count === 1 ? "sesión" : "sesiones"})
                               </span>
-                              <span className="text-text-light dark:text-text-dark">
-                                {Math.floor(minutes / 60)}h {minutes % 60}m
-                              </span>
-                            </li>
-                          );
-                        })}
+                            </span>
+                            <span className="text-text-light dark:text-text-dark">
+                              {Math.floor(agg.minutes / 60)}h{" "}
+                              {agg.minutes % 60}m
+                            </span>
+                          </li>
+                        ))}
                         <li className="flex justify-between py-2 border-b border-border-light dark:border-border-dark last:border-b-0 font-medium text-primary">
                           <span>Total del día</span>
                           <span>
