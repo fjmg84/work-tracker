@@ -6,6 +6,7 @@
   "author": "Work Tracker",
   "license": "MIT",
   "scripts": {
+    "sign": "codesign --force --deep --sign - --entitlements entitlements.mac.plist \"$(find node_modules -path '*/electron/dist/Electron.app/Contents/MacOS/Electron' -print -quit)\"",
     "dev": "concurrently \"npm run dev:vite\" \"npm run build:electron && wait-on http://localhost:5170 && npm run dev:electron\"",
     "dev:vite": "vite",
     "dev:electron": "node scripts/dev-electron.js",
@@ -58,6 +59,7 @@
     "concurrently": "^8.2.2",
     "electron": "^31.1.0",
     "electron-builder": "^26.15.3",
+    "esbuild": "^0.28.1",
     "tailwindcss": "^4.3.2",
     "typescript": "^5.5.2",
     "vite": "^5.3.2",
