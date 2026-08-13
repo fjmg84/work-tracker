@@ -7,6 +7,7 @@ import {
   RotateCcw,
   Clock,
   AlertCircle,
+  Video,
 } from "lucide-react";
 import { toast } from "sonner";
 import PrDescriptionModal from "./PrDescriptionModal";
@@ -15,8 +16,11 @@ import { useAppStore } from "../store/appStore";
 
 export default function Timer() {
   const projects = useAppStore((s) => s.projects);
+  const accounts = useAppStore((s) => s.accounts);
   const bumpSessionsVersion = useAppStore((s) => s.bumpSessionsVersion);
+  const [sessionType, setSessionType] = useState<"work" | "meet">("work");
   const [selectedProjectId, setSelectedProjectId] = useState<string>("");
+  const [selectedAccountId, setSelectedAccountId] = useState<string>("");
   const [activeSession, setActiveSession] = useState<Session | null>(null);
   const [notes, setNotes] = useState<string>("");
   const [loading, setLoading] = useState<boolean>(true);
@@ -30,20 +34,21 @@ export default function Timer() {
   } | null>(null);
 
   const isPaused = activeSession !== null && activeSession.paused_at !== null;
+  const activeSessionType = activeSession?.session_type ?? "work";
 
   useEffect(() => {
     async function load() {
       const session = await window.api.db.getActiveSession();
       if (session) {
         setActiveSession(session);
-        setSelectedProjectId(String(session.project_id));
+        if (session.project_id) setSelectedProjectId(String(session.project_id));
+        if (session.account_id) setSelectedAccountId(String(session.account_id));
         setNotes(session.notes || "");
       }
       setLoading(false);
     }
     load();
 
-    // Listen for auto-pause events from idle detection
     const handleAutoPause = () => {
       window.api.db.getActiveSession().then((session) => {
         if (session) {
@@ -52,7 +57,6 @@ export default function Timer() {
       });
     };
 
-    // Listen for stale sessions from main process
     const handleStaleDetected = (sessions: Session[]) => {
       setStaleSessions(sessions);
     };
@@ -72,8 +76,9 @@ export default function Timer() {
     };
   }, []);
 
-  const start = async () => {
-    if (!selectedProjectId) return;
+  const start = async (type: "work" | "meet" = "work") => {
+    if (type === "work" && !selectedProjectId) return;
+    if (type === "meet" && !selectedAccountId) return;
 
     const existing = await window.api.db.getActiveSession();
     if (existing) {
@@ -82,9 +87,11 @@ export default function Timer() {
     }
 
     const session = await window.api.db.createSession({
-      project_id: Number(selectedProjectId),
+      project_id: type === "work" ? Number(selectedProjectId) : undefined,
+      account_id: type === "meet" ? Number(selectedAccountId) : undefined,
       start_time: Date.now(),
       notes,
+      session_type: type,
     });
     setActiveSession(session);
     bumpSessionsVersion();
@@ -100,7 +107,7 @@ export default function Timer() {
     const project = projects.find((p) => p.id === activeSession.project_id);
     if (project) {
       setStoppedSession({
-        projectId: activeSession.project_id,
+        projectId: activeSession.project_id!,
         startTime: updated.start_time,
         endTime: updated.end_time ?? Date.now(),
         notes: notes,
@@ -161,26 +168,76 @@ export default function Timer() {
         </div>
       )}
 
-      <div className="flex gap-3 mb-3 items-end">
-        <div className="flex-1">
-          <label className="block text-sm text-text-muted-light dark:text-text-muted-dark mb-1">
-            Proyecto
-          </label>
-          <select
-            className="input"
-            value={selectedProjectId}
-            onChange={(e) => setSelectedProjectId(e.target.value)}
-            disabled={!!activeSession}
+      {!activeSession && (
+        <div className="flex gap-2 mb-3">
+          <button
+            className={`flex-1 py-2 px-4 rounded-lg text-sm font-medium transition-colors ${
+              sessionType === "work"
+                ? "bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 border border-blue-300 dark:border-blue-700"
+                : "bg-surface-muted-light dark:bg-surface-muted-dark text-text-muted-light dark:text-text-muted-dark border border-border-light dark:border-border-dark"
+            }`}
+            onClick={() => setSessionType("work")}
           >
-            <option value="">Selecciona un proyecto</option>
-            {projects.map((p) => (
-              <option key={p.id} value={p.id}>
-                {p.name} ({p.account_label})
-              </option>
-            ))}
-          </select>
+            <Clock className="w-4 h-4 inline mr-1" />
+            Trabajo
+          </button>
+          <button
+            className={`flex-1 py-2 px-4 rounded-lg text-sm font-medium transition-colors ${
+              sessionType === "meet"
+                ? "bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300 border border-purple-300 dark:border-purple-700"
+                : "bg-surface-muted-light dark:bg-surface-muted-dark text-text-muted-light dark:text-text-muted-dark border border-border-light dark:border-border-dark"
+            }`}
+            onClick={() => setSessionType("meet")}
+          >
+            <Video className="w-4 h-4 inline mr-1" />
+            Meet
+          </button>
         </div>
-      </div>
+      )}
+
+      {!activeSession && sessionType === "work" && (
+        <div className="flex gap-3 mb-3 items-end">
+          <div className="flex-1">
+            <label className="block text-sm text-text-muted-light dark:text-text-muted-dark mb-1">
+              Proyecto
+            </label>
+            <select
+              className="input"
+              value={selectedProjectId}
+              onChange={(e) => setSelectedProjectId(e.target.value)}
+            >
+              <option value="">Selecciona un proyecto</option>
+              {projects.map((p) => (
+                <option key={p.id} value={p.id}>
+                  {p.name} ({p.account_label})
+                </option>
+              ))}
+            </select>
+          </div>
+        </div>
+      )}
+
+      {!activeSession && sessionType === "meet" && (
+        <div className="flex gap-3 mb-3 items-end">
+          <div className="flex-1">
+            <label className="block text-sm text-text-muted-light dark:text-text-muted-dark mb-1">
+              Empresa (opcional)
+            </label>
+            <select
+              className="input"
+              value={selectedAccountId}
+              onChange={(e) => setSelectedAccountId(e.target.value)}
+            >
+              <option value="">Sin empresa</option>
+              {accounts.map((a) => (
+                <option key={a.id} value={a.id}>
+                  {a.label}
+                </option>
+              ))}
+            </select>
+          </div>
+        </div>
+      )}
 
       <div className="flex gap-3 mb-3 items-end">
         <div className="flex-1">
@@ -192,7 +249,7 @@ export default function Timer() {
             className="input"
             value={notes}
             onChange={(e) => setNotes(e.target.value)}
-            placeholder="Qué estás haciendo..."
+            placeholder={sessionType === "meet" ? "Tema de la reunión..." : "Qué estás haciendo..."}
             disabled={!!activeSession}
           />
         </div>
@@ -200,15 +257,53 @@ export default function Timer() {
 
       <TimerDisplay session={activeSession} />
 
+      {activeSession && (
+        <div className="mb-3 text-center">
+          <span
+            className={`inline-flex items-center gap-1 px-2 py-1 rounded text-xs font-medium ${
+              activeSessionType === "meet"
+                ? "bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300"
+                : "bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300"
+            }`}
+          >
+            {activeSessionType === "meet" ? (
+              <>
+                <Video className="w-3 h-3" />
+                Meet
+              </>
+            ) : (
+              <>
+                <Clock className="w-3 h-3" />
+                Trabajo
+              </>
+            )}
+          </span>
+        </div>
+      )}
+
       <div className="flex gap-3 justify-center">
-        <button
-          className="btn btn-primary min-w-[120px] text-base py-3 px-5 flex items-center justify-center gap-2"
-          onClick={start}
-          disabled={!selectedProjectId || !!activeSession}
-        >
-          <Play className="w-4 h-4" />
-          Iniciar
-        </button>
+        {!activeSession && (
+          <button
+            className="btn btn-primary min-w-[120px] text-base py-3 px-5 flex items-center justify-center gap-2"
+            onClick={() => start(sessionType)}
+            disabled={
+              (sessionType === "work" && !selectedProjectId) ||
+              (sessionType === "meet" && !selectedAccountId)
+            }
+          >
+            {sessionType === "meet" ? (
+              <>
+                <Video className="w-4 h-4" />
+                Iniciar Meet
+              </>
+            ) : (
+              <>
+                <Play className="w-4 h-4" />
+                Iniciar
+              </>
+            )}
+          </button>
+        )}
         <button
           className="btn btn-danger min-w-[120px] text-base py-3 px-5 flex items-center justify-center gap-2"
           onClick={stop}
@@ -250,11 +345,11 @@ export default function Timer() {
         </p>
       )}
 
-      {!projects.length && (
+      {!projects.length && !accounts.length && (
         <div className="text-center py-8 mt-3">
           <Clock className="w-12 h-12 mx-auto text-text-muted-light dark:text-text-muted-dark mb-3" />
           <p className="text-text-muted-light dark:text-text-muted-dark">
-            Crea al menos un proyecto y una cuenta de GitHub para empezar.
+            Crea al menos un proyecto o una cuenta de GitHub para empezar.
           </p>
         </div>
       )}

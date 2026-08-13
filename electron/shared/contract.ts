@@ -34,20 +34,26 @@ export interface ProjectInput {
   account_id: number;
 }
 
+export type SessionType = "work" | "meet";
+
 export interface Session {
   id: number;
-  project_id: number;
+  project_id: number | null;
   start_time: number;
   end_time: number | null;
   notes: string;
   paused_at: number | null;
   total_paused_ms: number;
+  session_type: SessionType;
+  account_id: number | null;
 }
 
 export interface SessionInput {
-  project_id: number;
+  project_id?: number;
   start_time: number;
   notes?: string;
+  session_type?: SessionType;
+  account_id?: number;
 }
 
 export interface PullRequest {
@@ -91,6 +97,7 @@ export type SessionFilter = {
   projectId?: number;
   from?: number;
   to?: number;
+  accountId?: number;
 };
 
 // ============================================================

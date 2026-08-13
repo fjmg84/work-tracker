@@ -113,12 +113,14 @@ export const projectQueries = {
 
 interface SessionRow {
   id: number;
-  project_id: number;
+  project_id: number | null;
   start_time: number;
   end_time: number | null;
   notes: string;
   paused_at: number | null;
   total_paused_ms: number;
+  session_type: string;
+  account_id: number | null;
 }
 
 const SELECT_SESSION_BY_ID = "SELECT * FROM sessions WHERE id = ?";
@@ -126,7 +128,7 @@ const SELECT_SESSION_BY_ID = "SELECT * FROM sessions WHERE id = ?";
 export const sessionQueries = {
   listFiltered: (
     db: Database.Database,
-    { projectId, from, to }: { projectId?: number; from?: number; to?: number },
+    { projectId, from, to, accountId }: { projectId?: number; from?: number; to?: number; accountId?: number },
   ) => {
     let query = "SELECT * FROM sessions WHERE 1=1";
     const params: number[] = [];
@@ -134,6 +136,10 @@ export const sessionQueries = {
     if (projectId) {
       query += " AND project_id = ?";
       params.push(projectId);
+    }
+    if (accountId) {
+      query += " AND (account_id = ? OR (account_id IS NULL AND project_id IN (SELECT id FROM projects WHERE account_id = ?)))";
+      params.push(accountId, accountId);
     }
     if (from) {
       query += " AND start_time >= ?";
@@ -154,12 +160,14 @@ export const sessionQueries = {
       project_id,
       start_time,
       notes,
-    }: { project_id: number; start_time: number; notes?: string },
+      session_type,
+      account_id,
+    }: { project_id?: number; start_time: number; notes?: string; session_type?: string; account_id?: number },
   ) =>
     stmt(
       db,
-      "INSERT INTO sessions (project_id, start_time, notes) VALUES (?, ?, ?)",
-    ).run(project_id, start_time, notes || ""),
+      "INSERT INTO sessions (project_id, start_time, notes, session_type, account_id) VALUES (?, ?, ?, ?, ?)",
+    ).run(project_id ?? null, start_time, notes || "", session_type || "work", account_id ?? null),
 
   stop: (
     db: Database.Database,

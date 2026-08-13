@@ -8,23 +8,27 @@ import {
   assertIdArray,
   assertTimestamp,
   optionalString,
+  optionalId,
 } from "./validate";
 
 export function registerSessionHandlers(db: Database.Database): void {
   ipcMain.handle(IPC.db.listSessions, (_, filters) => {
-    const { projectId, from, to } = filters ?? {};
+    const { projectId, from, to, accountId } = filters ?? {};
     if (projectId !== undefined) assertId(projectId, "projectId");
     if (from !== undefined) assertTimestamp(from, "from");
     if (to !== undefined) assertTimestamp(to, "to");
-    return sessionQueries.listFiltered(db, { projectId, from, to });
+    if (accountId !== undefined) assertId(accountId, "accountId");
+    return sessionQueries.listFiltered(db, { projectId, from, to, accountId });
   });
 
   ipcMain.handle(IPC.db.createSession, (_, payload) => {
-    const { project_id, start_time, notes } = payload ?? {};
-    assertId(project_id, "project_id");
+    const { project_id, start_time, notes, session_type, account_id } = payload ?? {};
+    if (project_id !== undefined) assertId(project_id, "project_id");
     assertTimestamp(start_time, "start_time");
     optionalString(notes, "notes");
-    const info = sessionQueries.create(db, { project_id, start_time, notes });
+    optionalString(session_type, "session_type");
+    optionalId(account_id, "account_id");
+    const info = sessionQueries.create(db, { project_id, start_time, notes, session_type, account_id });
     return sessionQueries.getById(db, Number(info.lastInsertRowid));
   });
 
