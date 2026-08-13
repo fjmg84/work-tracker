@@ -2,6 +2,7 @@
 export * from "../electron/shared/contract";
 
 import type {
+  Account,
   Project,
   PullRequest,
   Session,
@@ -16,4 +17,5 @@ export interface ReportData {
   projects: Project[];
   prs: PullRequest[];
   commits?: Commit[];
+  accounts?: Account[];
 }

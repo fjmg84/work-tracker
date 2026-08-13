@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { generateReport } from "../lib/csv";
 import { Session, PullRequest, Commit } from "../types";
 import MonthYearSelector from "./MonthYearSelector";
-import { Download, FileText, RefreshCw } from "lucide-react";
+import { Download, FileText, RefreshCw, Video, Clock } from "lucide-react";
 import { toast } from "sonner";
 import Summary from "./Summary";
 import { SummaryType } from "@/types/reports";
@@ -17,12 +17,18 @@ function sessionMinutes(s: Session): number {
   );
 }
 
+function sessionType(s: Session): "work" | "meet" {
+  return (s as any).session_type === "meet" ? "meet" : "work";
+}
+
 export default function Reports() {
   const projects = useAppStore((s) => s.projects);
+  const accounts = useAppStore((s) => s.accounts);
   const sessionsVersion = useAppStore((s) => s.sessionsVersion);
   const [year, setYear] = useState<number>(new Date().getFullYear());
   const [month, setMonth] = useState<number>(new Date().getMonth() + 1);
   const [selectedProjects, setSelectedProjects] = useState<number[]>([]);
+  const [selectedAccounts, setSelectedAccounts] = useState<number[]>([]);
   const [allSessions, setAllSessions] = useState<Session[]>([]);
   const [activity, setActivity] = useState<{
     prs: ReportPr[];
@@ -40,18 +46,12 @@ export default function Reports() {
     [year, month],
   );
 
-  // Sesiones: SQLite local (barato). Se recarga al cambiar de mes o al
-  // guardar/cerrar sesiones (sessionsVersion).
   useEffect(() => {
     window.api.db
       .listSessions({ from: monthRange.start, to: monthRange.end })
       .then(setAllSessions);
   }, [monthRange, sessionsVersion]);
 
-  // Actividad de GitHub: red. Solo se carga al cambiar de mes o de proyectos,
-  // en paralelo; el proceso main la cachea con TTL. Los checkboxes de
-  // proyectos filtran en memoria sin llamadas de red. El botón de refresco
-  // fuerza una descarga nueva ignorando la caché.
   useEffect(() => {
     if (projects.length === 0) {
       setActivity({ prs: [], commits: [] });
@@ -116,14 +116,29 @@ export default function Reports() {
     };
   }, [monthRange, projects, activityRefreshTick]);
 
-  // selectedProjects === [] significa "todos"
-  const sessions = useMemo(
-    () =>
-      selectedProjects.length
-        ? allSessions.filter((s) => selectedProjects.includes(s.project_id))
-        : allSessions,
-    [allSessions, selectedProjects],
-  );
+  const sessions = useMemo(() => {
+    return allSessions.filter((s) => {
+      const type = sessionType(s);
+
+      if (type === "work") {
+        if (selectedProjects.length > 0) {
+          return selectedProjects.includes(s.project_id ?? 0);
+        }
+        return true;
+      }
+
+      if (type === "meet") {
+        if (selectedAccounts.length > 0) {
+          const accountMatch = selectedAccounts.includes(s.account_id ?? -1);
+          const noAccount = selectedAccounts.includes(-1) && !s.account_id;
+          return accountMatch || noAccount;
+        }
+        return true;
+      }
+
+      return true;
+    });
+  }, [allSessions, selectedProjects, selectedAccounts]);
 
   const filteredPrs = useMemo(
     () =>
@@ -143,29 +158,60 @@ export default function Reports() {
 
   const summary = useMemo<SummaryType>(() => {
     const finished = sessions.filter((s) => s.end_time);
+    const workMinutes = finished
+      .filter((s) => sessionType(s) === "work")
+      .reduce((acc, s) => acc + sessionMinutes(s), 0);
+    const meetMinutes = finished
+      .filter((s) => sessionType(s) === "meet")
+      .reduce((acc, s) => acc + sessionMinutes(s), 0);
     return {
-      totalMinutes: finished.reduce((acc, s) => acc + sessionMinutes(s), 0),
+      totalMinutes: workMinutes + meetMinutes,
+      workMinutes,
+      meetMinutes,
       sessions: finished.length,
       prs: filteredPrs.length,
       commits: filteredCommits.length,
     };
   }, [sessions, filteredPrs, filteredCommits]);
 
-  // Solo se muestran en el filtro los proyectos con sesiones este mes
   const activeProjects = useMemo(() => {
-    const activeProjectIds = new Set(allSessions.map((s) => s.project_id));
+    const activeProjectIds = new Set(
+      allSessions
+        .filter((s) => sessionType(s) === "work")
+        .map((s) => s.project_id),
+    );
     return projects.filter((p) => activeProjectIds.has(p.id));
   }, [allSessions, projects]);
 
+  const activeAccounts = useMemo(() => {
+    const activeAccountIds = new Set(
+      allSessions
+        .filter((s) => sessionType(s) === "meet" && s.account_id)
+        .map((s) => s.account_id),
+    );
+    const result = accounts.filter((a) => activeAccountIds.has(a.id));
+
+    const hasMeetWithoutAccount = allSessions.some(
+      (s) => sessionType(s) === "meet" && !s.account_id,
+    );
+    if (hasMeetWithoutAccount) {
+      result.push({ id: -1, label: "Sin empresa", username: "" });
+    }
+
+    return result;
+  }, [allSessions, accounts]);
+
   const sessionsByWeekAggregated = useMemo(() => {
-    type ProjectAgg = {
-      projectId: number;
+    type SessionAgg = {
+      projectId: number | null;
       projectName: string;
       accountLabel: string;
       minutes: number;
       count: number;
+      type: "work" | "meet";
     };
-    const groups: Record<string, Record<string, ProjectAgg[]>> = {};
+    const groups: Record<string, Record<string, SessionAgg[]>> = {};
+
     for (const s of sessions) {
       if (!s.end_time) continue;
       const d = new Date(s.start_time);
@@ -174,34 +220,57 @@ export default function Reports() {
       monday.setDate(d.getDate() - dayOfWeek);
       const weekKey = `${monday.getFullYear()}-${String(monday.getMonth() + 1).padStart(2, "0")}-${String(monday.getDate()).padStart(2, "0")}`;
       const dayKey = `Día ${d.getDate()}`;
-      const project =
-        projects.find((p) => p.id === s.project_id) ?? {
-          name: "-",
-          account_label: "-",
-        };
+      const type = sessionType(s);
+
+      let projectName = "-";
+      let accountLabel = "-";
+      let aggKey: string;
+
+      if (type === "work") {
+        const project = projects.find((p) => p.id === s.project_id);
+        projectName = project?.name ?? "-";
+        accountLabel = project?.account_label ?? "-";
+        aggKey = `work-${s.project_id}`;
+      } else {
+        const account = accounts.find((a) => a.id === s.account_id);
+        accountLabel = account?.label ?? "Sin empresa";
+        projectName = "Meet";
+        aggKey = `meet-${s.account_id ?? "none"}`;
+      }
+
       const dayBucket = (groups[weekKey] ??= {});
-      const projectBucket = dayBucket[dayKey] ??= [];
-      let agg = projectBucket.find((a) => a.projectId === s.project_id);
+      const sessionBucket = dayBucket[dayKey] ??= [];
+      let agg = sessionBucket.find((a) => {
+        const key =
+          a.type === "work" ? `work-${a.projectId}` : `meet-${a.projectId ?? "none"}`;
+        return key === aggKey;
+      });
+
       if (!agg) {
         agg = {
-          projectId: s.project_id,
-          projectName: project.name,
-          accountLabel: project.account_label,
+          projectId: type === "meet" ? s.account_id : s.project_id,
+          projectName,
+          accountLabel,
           minutes: 0,
           count: 0,
+          type,
         };
-        projectBucket.push(agg);
+        sessionBucket.push(agg);
       }
       agg.minutes += sessionMinutes(s);
       agg.count += 1;
     }
+
     for (const week of Object.values(groups)) {
       for (const day of Object.values(week)) {
-        day.sort((a, b) => b.minutes - a.minutes);
+        day.sort((a, b) => {
+          if (a.type !== b.type) return a.type === "meet" ? 1 : -1;
+          return b.minutes - a.minutes;
+        });
       }
     }
     return groups;
-  }, [sessions, projects]);
+  }, [sessions, projects, accounts]);
 
   const exportCsv = async () => {
     const content = generateReport({
@@ -210,6 +279,7 @@ export default function Reports() {
       sessions,
       projects,
       prs: filteredPrs,
+      accounts,
     });
 
     const defaultPath = `reporte-${year}-${String(month).padStart(2, "0")}.csv`;
@@ -233,7 +303,11 @@ export default function Reports() {
           onYearChange={setYear}
           onMonthChange={setMonth}
         />
+
         <div className="flex-1">
+          <label className="block text-xs text-text-muted-light dark:text-text-muted-dark mb-1">
+            Filtrar por proyecto
+          </label>
           <div className="input max-h-32 overflow-y-auto">
             <label className="flex items-center gap-2 cursor-pointer mb-1 last:mb-0">
               <input
@@ -266,11 +340,51 @@ export default function Reports() {
             ))}
           </div>
         </div>
+
+        {activeAccounts.length > 0 && (
+          <div className="flex-1">
+            <label className="block text-xs text-text-muted-light dark:text-text-muted-dark mb-1">
+              Filtrar meet por empresa
+            </label>
+            <div className="input max-h-32 overflow-y-auto">
+              <label className="flex items-center gap-2 cursor-pointer mb-1 last:mb-0">
+                <input
+                  type="checkbox"
+                  className="accent-purple-500"
+                  checked={selectedAccounts.length === 0}
+                  onChange={() => setSelectedAccounts([])}
+                />
+                <span className="text-sm">Todas</span>
+              </label>
+              {activeAccounts.map((a) => (
+                <label
+                  key={a.id}
+                  className="flex items-center gap-2 cursor-pointer mb-1 last:mb-0"
+                >
+                  <input
+                    type="checkbox"
+                    className="accent-purple-500"
+                    checked={selectedAccounts.includes(a.id)}
+                    onChange={() =>
+                      setSelectedAccounts((prev) =>
+                        prev.includes(a.id)
+                          ? prev.filter((id) => id !== a.id)
+                          : [...prev, a.id],
+                      )
+                    }
+                  />
+                  <span className="text-sm truncate">{a.label}</span>
+                </label>
+              ))}
+            </div>
+          </div>
+        )}
+
         <div className="flex-1 flex gap-2">
           <button
             className="btn btn-primary flex-1 flex items-center justify-center gap-2"
             onClick={exportCsv}
-            disabled={projects.length === 0}
+            disabled={projects.length === 0 && accounts.length === 0}
           >
             <Download className="w-4 h-4" />
             Exportar CSV
@@ -318,31 +432,55 @@ export default function Reports() {
           {Object.entries(sessionsByWeekAggregated).map(([weekKey, days]) => {
             let weekMinutes = 0;
             const dayEntries = Object.entries(days).map(
-              ([dayKey, projectAggs]) => {
-                const dayMinutes = projectAggs.reduce(
+              ([dayKey, sessionAggs]) => {
+                const dayMinutes = sessionAggs.reduce(
                   (acc, a) => acc + a.minutes,
                   0,
                 );
                 weekMinutes += dayMinutes;
-                return { dayKey, projectAggs, dayMinutes };
+                return { dayKey, sessionAggs, dayMinutes };
               },
             );
             return (
               <li key={weekKey} className="mb-4">
                 <ul className="list-none">
-                  {dayEntries.map(({ dayKey, projectAggs, dayMinutes }) => (
+                  {dayEntries.map(({ dayKey, sessionAggs, dayMinutes }) => (
                     <li key={dayKey} className="mb-4">
                       <div className="text-sm font-medium text-text-light dark:text-text-dark mb-2">
                         {dayKey}
                       </div>
                       <ul className="list-none">
-                        {projectAggs.map((agg) => (
+                        {sessionAggs.map((agg, idx) => (
                           <li
-                            key={agg.projectId}
+                            key={`${agg.projectId}-${agg.type}-${idx}`}
                             className="flex justify-between py-2 border-b border-border-light dark:border-border-dark last:border-b-0"
                           >
-                            <span className="text-text-light dark:text-text-dark">
+                            <span className="text-text-light dark:text-text-dark flex items-center gap-2">
                               {agg.projectName}
+                              {agg.type === "meet" && (
+                                <span className="text-text-muted-light dark:text-text-muted-dark text-xs">
+                                  ({agg.accountLabel})
+                                </span>
+                              )}
+                              <span
+                                className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium ${
+                                  agg.type === "meet"
+                                    ? "bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300"
+                                    : "bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300"
+                                }`}
+                              >
+                                {agg.type === "meet" ? (
+                                  <>
+                                    <Video className="w-2.5 h-2.5" />
+                                    Meet
+                                  </>
+                                ) : (
+                                  <>
+                                    <Clock className="w-2.5 h-2.5" />
+                                    Trabajo
+                                  </>
+                                )}
+                              </span>
                               <span className="text-text-muted-light dark:text-text-muted-dark text-xs ml-2">
                                 ({agg.count}{" "}
                                 {agg.count === 1 ? "sesión" : "sesiones"})

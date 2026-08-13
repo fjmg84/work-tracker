@@ -80,3 +80,12 @@ export function optionalBoolean(
     throw new Error(`Parámetro inválido: ${name} debe ser booleano.`);
   }
 }
+
+export function optionalId(
+  value: unknown,
+  name: string,
+): asserts value is number | undefined {
+  if (value !== undefined && (typeof value !== "number" || !Number.isInteger(value) || value <= 0)) {
+    throw new Error(`Parámetro inválido: ${name} debe ser un entero positivo.`);
+  }
+}
