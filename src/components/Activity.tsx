@@ -1,5 +1,6 @@
 import { useMemo, useState } from "react";
 import { GitHubActivity, PullRequest, GitHubActivityError } from "../types";
+import { dayjs } from "../lib/date";
 import MonthYearSelector from "./MonthYearSelector";
 import PrDescriptionModal from "./PrDescriptionModal";
 import { useAppStore } from "../store/appStore";
@@ -16,8 +17,8 @@ import {
 
 export default function Activity() {
   const projects = useAppStore((s) => s.projects);
-  const [year, setYear] = useState<number>(new Date().getFullYear());
-  const [month, setMonth] = useState<number>(new Date().getMonth() + 1);
+  const [year, setYear] = useState<number>(dayjs().year());
+  const [month, setMonth] = useState<number>(dayjs().month() + 1);
   const [loading, setLoading] = useState<boolean>(false);
   const [result, setResult] = useState<GitHubActivity | null>(null);
   const [error, setError] = useState<string>("");
@@ -58,8 +59,8 @@ export default function Activity() {
     setResult(null);
 
     try {
-      const start = new Date(year, month - 1, 1).getTime();
-      const end = new Date(year, month, 0, 23, 59, 59, 999).getTime();
+      const start = dayjs().year(year).month(month - 1).startOf("month").valueOf();
+      const end = dayjs().year(year).month(month - 1).endOf("month").valueOf();
 
       const results = await Promise.allSettled(
         projects.map(async (project) => {
@@ -222,9 +223,7 @@ export default function Activity() {
                                   #{pr.number} {pr.title}
                                 </a>
                                 <div className="text-xs text-text-muted-light dark:text-text-muted-dark mt-0.5 flex items-center gap-2">
-                                  {new Date(pr.created_at).toLocaleDateString(
-                                    "es-ES",
-                                  )}{" "}
+                                  {dayjs(pr.created_at).format("DD/MM/YYYY")}{" "}
                                   · {pr.projectName}
                                   <span
                                     className={`badge ${
@@ -278,9 +277,7 @@ export default function Activity() {
                                       </a>{" "}
                                       {c.message}
                                       <div className="text-xs text-text-muted-light dark:text-text-muted-dark mt-0.5">
-                                        {new Date(c.date).toLocaleDateString(
-                                          "es-ES",
-                                        )}
+                                        {dayjs(c.date).format("DD/MM/YYYY")}
                                       </div>
                                     </div>
                                   </div>

@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { Session } from "../types";
+import { dayjs } from "../lib/date";
 import {
   Play,
   Square,
@@ -89,7 +90,7 @@ export default function Timer() {
     const session = await window.api.db.createSession({
       project_id: type === "work" ? Number(selectedProjectId) : undefined,
       account_id: type === "meet" ? Number(selectedAccountId) : undefined,
-      start_time: Date.now(),
+      start_time: dayjs().valueOf(),
       notes,
       session_type: type,
     });
@@ -99,7 +100,7 @@ export default function Timer() {
 
   const stop = async () => {
     if (!activeSession) return;
-    const endTime = isPaused ? activeSession.paused_at! : Date.now();
+    const endTime = isPaused ? activeSession.paused_at! : dayjs().valueOf();
     const updated = await window.api.db.stopSession({
       id: activeSession.id,
       end_time: endTime,
@@ -109,7 +110,7 @@ export default function Timer() {
       setStoppedSession({
         projectId: activeSession.project_id!,
         startTime: updated.start_time,
-        endTime: updated.end_time ?? Date.now(),
+        endTime: updated.end_time ?? dayjs().valueOf(),
         notes: notes,
       });
       setShowPrModal(true);
@@ -335,7 +336,7 @@ export default function Timer() {
       {activeSession && (
         <p className="text-sm text-text-muted-light dark:text-text-muted-dark mt-3 text-center">
           Sesión activa desde{" "}
-          {new Date(activeSession.start_time).toLocaleString("es-ES")}
+          {dayjs(activeSession.start_time).format("DD/MM/YYYY HH:mm")}
           {activeSession.total_paused_ms > 0 && (
             <span>
               {" "}
