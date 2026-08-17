@@ -18,4 +18,5 @@ export interface ReportData {
   prs: PullRequest[];
   commits?: Commit[];
   accounts?: Account[];
+  dateRange?: boolean;
 }
