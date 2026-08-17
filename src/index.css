@@ -117,3 +117,48 @@
 .animate-fade-in {
   animation: fade-in 0.3s ease-out;
 }
+
+/* Tabs */
+.tabs {
+  @apply flex gap-1 p-1 rounded-lg bg-surface-muted-light dark:bg-surface-muted-dark;
+}
+
+.tab {
+  @apply flex-1 flex items-center justify-center gap-2 px-4 py-2 rounded-md text-sm font-medium transition-all duration-150 cursor-pointer;
+}
+
+.tab-active {
+  @apply bg-surface-light dark:bg-surface-dark shadow-sm text-text-light dark:text-text-dark;
+}
+
+.tab-inactive {
+  @apply text-text-muted-light dark:text-text-muted-dark hover:text-text-light dark:hover:text-text-dark;
+}
+
+/* Separator */
+.separator {
+  @apply border-t border-border-light dark:border-border-dark my-4;
+}
+
+/* Week header */
+.week-header {
+  @apply flex items-center gap-3 py-2 mb-2;
+}
+
+.week-header-line {
+  @apply flex-1 h-px bg-border-light dark:bg-border-dark;
+}
+
+.week-header-label {
+  @apply text-xs font-medium text-text-muted-light dark:text-text-muted-dark uppercase tracking-wider;
+}
+
+/* Day header */
+.day-header {
+  @apply sticky top-0 z-10 bg-surface-light dark:bg-surface-dark py-1.5 px-2 rounded-md mb-1;
+}
+
+/* Date input */
+.date-input {
+  @apply px-2 py-1.5 border border-border-light dark:border-border-dark rounded-md text-sm bg-surface-light dark:bg-surface-muted-dark text-text-light dark:text-text-dark focus:outline-none focus:border-primary focus:ring-1 focus:ring-focus-ring;
+}
