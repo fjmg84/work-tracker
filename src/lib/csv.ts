@@ -46,14 +46,15 @@ function generateReport({
   projects,
   prs,
   accounts,
+  dateRange,
 }: ReportData & { accounts?: Account[] }): string {
-  const startOfMonth = new Date(year, month - 1, 1).getTime();
-  const endOfMonth = new Date(year, month, 0, 23, 59, 59, 999).getTime();
-
-  const filteredSessions = sessions.filter((s) => {
-    const start = s.start_time;
-    return start >= startOfMonth && start <= endOfMonth && s.end_time;
-  });
+  const filteredSessions = dateRange
+    ? sessions.filter((s) => s.end_time)
+    : sessions.filter((s) => {
+        const start = new Date(year, month - 1, 1).getTime();
+        const end = new Date(year, month, 0, 23, 59, 59, 999).getTime();
+        return s.start_time >= start && s.start_time <= end && s.end_time;
+      });
 
   const projectHours: Record<string, { work: number; meet: number }> = {};
   const accountHours: Record<number, number> = {};
@@ -63,7 +64,9 @@ function generateReport({
 
   for (const s of filteredSessions) {
     const type = (s as any).session_type === "meet" ? "meet" : "work";
-    const duration = Math.round(((s.end_time ?? 0) - s.start_time - (s.total_paused_ms ?? 0)) / 60000);
+    const duration = Math.round(
+      ((s.end_time ?? 0) - s.start_time - (s.total_paused_ms ?? 0)) / 60000,
+    );
 
     if (type === "work") {
       totalWorkMinutes += duration;
@@ -115,6 +118,15 @@ function generateReport({
 
   const summaryRows: Record<string, unknown>[] = [];
 
+  summaryRows.push({
+    Tipo: "Total general",
+    Proyecto: "Todos",
+    Cuenta: "-",
+    Usuario_GitHub: "-",
+    Subtipo: "Total",
+    Total_Horas: formatDuration(totalWorkMinutes + totalMeetMinutes),
+    Total_Minutos: totalWorkMinutes + totalMeetMinutes,
+  });
   summaryRows.push({
     Tipo: "Total general",
     Proyecto: "Todos",
@@ -208,7 +220,7 @@ function generateReport({
       const commitsText =
         pr.commits && pr.commits.length > 0
           ? pr.commits
-              .map((c) => `• ${c.sha.substring(0, 7)}: ${c.message}`)
+              .map((c) => `- ${c.sha.substring(0, 7)}: ${c.message}`)
               .join("\n")
           : "Sin commits";
 
