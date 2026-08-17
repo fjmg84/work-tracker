@@ -1,4 +1,4 @@
-import { Calendar, CalendarDays } from "lucide-react";
+import { ChevronLeft, ChevronRight } from "lucide-react";
 
 interface MonthYearSelectorProps {
   year: number;
@@ -7,45 +7,59 @@ interface MonthYearSelectorProps {
   onMonthChange: (month: number) => void;
 }
 
+const MONTHS = [
+  "Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio",
+  "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre",
+];
+
 export default function MonthYearSelector({
   year,
   month,
   onYearChange,
   onMonthChange,
 }: MonthYearSelectorProps) {
+  const prev = () => {
+    if (month === 1) {
+      onMonthChange(12);
+      onYearChange(year - 1);
+    } else {
+      onMonthChange(month - 1);
+    }
+  };
+
+  const next = () => {
+    if (month === 12) {
+      onMonthChange(1);
+      onYearChange(year + 1);
+    } else {
+      onMonthChange(month + 1);
+    }
+  };
+
   return (
-    <>
-      <div className="flex-1">
-        <label className="block text-sm text-text-muted-light dark:text-text-muted-dark mb-1 flex items-center gap-2">
-          <Calendar className="w-4 h-4" />
-          Año
-        </label>
-        <input
-          type="number"
-          className="input"
-          value={year}
-          onChange={(e) => onYearChange(Number(e.target.value))}
-          aria-label="Año"
-        />
+    <div className="flex items-center gap-2">
+      <button
+        className="btn btn-ghost p-2"
+        onClick={prev}
+        aria-label="Mes anterior"
+      >
+        <ChevronLeft className="w-4 h-4" />
+      </button>
+      <div className="text-center min-w-[140px]">
+        <div className="text-sm font-medium text-text-light dark:text-text-dark">
+          {MONTHS[month - 1]}
+        </div>
+        <div className="text-xs text-text-muted-light dark:text-text-muted-dark">
+          {year}
+        </div>
       </div>
-      <div className="flex-1">
-        <label className="block text-sm text-text-muted-light dark:text-text-muted-dark mb-1 flex items-center gap-2">
-          <CalendarDays className="w-4 h-4" />
-          Mes
-        </label>
-        <select
-          className="input"
-          value={month}
-          onChange={(e) => onMonthChange(Number(e.target.value))}
-          aria-label="Mes"
-        >
-          {Array.from({ length: 12 }, (_, i) => (
-            <option key={i + 1} value={i + 1}>
-              {new Date(0, i).toLocaleString("es-ES", { month: "long" })}
-            </option>
-          ))}
-        </select>
-      </div>
-    </>
+      <button
+        className="btn btn-ghost p-2"
+        onClick={next}
+        aria-label="Mes siguiente"
+      >
+        <ChevronRight className="w-4 h-4" />
+      </button>
+    </div>
   );
 }
