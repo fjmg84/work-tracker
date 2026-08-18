@@ -285,7 +285,7 @@ export default function Timer() {
       <div className="flex gap-3 justify-center">
         {!activeSession && (
           <button
-            className="btn btn-primary min-w-[120px] text-base py-3 px-5 flex items-center justify-center gap-2"
+            className="btn btn-primary min-w-30 text-base py-3 px-5 flex items-center justify-center gap-2"
             onClick={() => start(sessionType)}
             disabled={
               (sessionType === "work" && !selectedProjectId) ||
@@ -306,7 +306,7 @@ export default function Timer() {
           </button>
         )}
         <button
-          className="btn btn-danger min-w-[120px] text-base py-3 px-5 flex items-center justify-center gap-2"
+          className="btn btn-danger min-w-30 text-base py-3 px-5 flex items-center justify-center gap-2"
           onClick={stop}
           disabled={!activeSession}
         >
@@ -315,7 +315,7 @@ export default function Timer() {
         </button>
         {activeSession && !isPaused && (
           <button
-            className="btn btn-secondary min-w-[120px] text-base py-3 px-5 flex items-center justify-center gap-2"
+            className="btn btn-secondary min-w-30 text-base py-3 px-5 flex items-center justify-center gap-2"
             onClick={pause}
           >
             <Pause className="w-4 h-4" />
@@ -324,7 +324,7 @@ export default function Timer() {
         )}
         {activeSession && isPaused && (
           <button
-            className="btn btn-primary min-w-[120px] text-base py-3 px-5 flex items-center justify-center gap-2"
+            className="btn btn-primary min-w-30 text-base py-3 px-5 flex items-center justify-center gap-2"
             onClick={resume}
           >
             <RotateCcw className="w-4 h-4" />
