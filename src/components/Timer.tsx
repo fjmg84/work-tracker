@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { Session } from "../types";
+import { dayjs } from "../lib/date";
 import {
   Play,
   Square,
@@ -89,7 +90,7 @@ export default function Timer() {
     const session = await window.api.db.createSession({
       project_id: type === "work" ? Number(selectedProjectId) : undefined,
       account_id: type === "meet" ? Number(selectedAccountId) : undefined,
-      start_time: Date.now(),
+      start_time: dayjs().valueOf(),
       notes,
       session_type: type,
     });
@@ -99,7 +100,7 @@ export default function Timer() {
 
   const stop = async () => {
     if (!activeSession) return;
-    const endTime = isPaused ? activeSession.paused_at! : Date.now();
+    const endTime = isPaused ? activeSession.paused_at! : dayjs().valueOf();
     const updated = await window.api.db.stopSession({
       id: activeSession.id,
       end_time: endTime,
@@ -109,7 +110,7 @@ export default function Timer() {
       setStoppedSession({
         projectId: activeSession.project_id!,
         startTime: updated.start_time,
-        endTime: updated.end_time ?? Date.now(),
+        endTime: updated.end_time ?? dayjs().valueOf(),
         notes: notes,
       });
       setShowPrModal(true);
@@ -284,7 +285,7 @@ export default function Timer() {
       <div className="flex gap-3 justify-center">
         {!activeSession && (
           <button
-            className="btn btn-primary min-w-[120px] text-base py-3 px-5 flex items-center justify-center gap-2"
+            className="btn btn-primary min-w-30 text-base py-3 px-5 flex items-center justify-center gap-2"
             onClick={() => start(sessionType)}
             disabled={
               (sessionType === "work" && !selectedProjectId) ||
@@ -305,7 +306,7 @@ export default function Timer() {
           </button>
         )}
         <button
-          className="btn btn-danger min-w-[120px] text-base py-3 px-5 flex items-center justify-center gap-2"
+          className="btn btn-danger min-w-30 text-base py-3 px-5 flex items-center justify-center gap-2"
           onClick={stop}
           disabled={!activeSession}
         >
@@ -314,7 +315,7 @@ export default function Timer() {
         </button>
         {activeSession && !isPaused && (
           <button
-            className="btn btn-secondary min-w-[120px] text-base py-3 px-5 flex items-center justify-center gap-2"
+            className="btn btn-secondary min-w-30 text-base py-3 px-5 flex items-center justify-center gap-2"
             onClick={pause}
           >
             <Pause className="w-4 h-4" />
@@ -323,7 +324,7 @@ export default function Timer() {
         )}
         {activeSession && isPaused && (
           <button
-            className="btn btn-primary min-w-[120px] text-base py-3 px-5 flex items-center justify-center gap-2"
+            className="btn btn-primary min-w-30 text-base py-3 px-5 flex items-center justify-center gap-2"
             onClick={resume}
           >
             <RotateCcw className="w-4 h-4" />
@@ -335,7 +336,7 @@ export default function Timer() {
       {activeSession && (
         <p className="text-sm text-text-muted-light dark:text-text-muted-dark mt-3 text-center">
           Sesión activa desde{" "}
-          {new Date(activeSession.start_time).toLocaleString("es-ES")}
+          {dayjs(activeSession.start_time).format("DD/MM/YYYY HH:mm")}
           {activeSession.total_paused_ms > 0 && (
             <span>
               {" "}

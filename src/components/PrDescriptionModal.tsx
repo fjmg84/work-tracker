@@ -427,7 +427,7 @@ export default function PrDescriptionModal({
                 </div>
               </div>
               <textarea
-                className="input min-h-[300px] font-mono text-sm resize-y"
+                className="input min-h-75 font-mono text-sm resize-y"
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
               />

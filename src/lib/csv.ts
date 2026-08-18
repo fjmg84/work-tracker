@@ -1,4 +1,5 @@
 import { ReportData, PullRequest } from "../types";
+import { dayjs } from "./date";
 
 function escapeCsv(value: unknown): string {
   if (value === null || value === undefined) return "";
@@ -27,14 +28,12 @@ function formatDuration(minutes: number): string {
 
 function formatDate(ts: number): string {
   if (!ts) return "";
-  const d = new Date(ts);
-  return d.toLocaleDateString("es-ES");
+  return dayjs(ts).format("DD/MM/YYYY");
 }
 
 function formatTime(ts: number): string {
   if (!ts) return "";
-  const d = new Date(ts);
-  return d.toLocaleTimeString("es-ES", { hour: "2-digit", minute: "2-digit" });
+  return dayjs(ts).format("HH:mm");
 }
 
 type Account = { id: number; label: string; username: string };
@@ -51,8 +50,8 @@ function generateReport({
   const filteredSessions = dateRange
     ? sessions.filter((s) => s.end_time)
     : sessions.filter((s) => {
-        const start = new Date(year, month - 1, 1).getTime();
-        const end = new Date(year, month, 0, 23, 59, 59, 999).getTime();
+        const start = dayjs().year(year).month(month - 1).startOf("month").valueOf();
+        const end = dayjs().year(year).month(month - 1).endOf("month").valueOf();
         return s.start_time >= start && s.start_time <= end && s.end_time;
       });
 
@@ -204,7 +203,7 @@ function generateReport({
       );
       if (projectCompare !== 0) return projectCompare;
       return (
-        new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
+        dayjs(a.created_at).valueOf() - dayjs(b.created_at).valueOf()
       );
     });
   }
@@ -216,7 +215,7 @@ function generateReport({
 
   for (const [account, accountPrs] of prsByAccount.entries()) {
     for (const pr of accountPrs) {
-      const currentDate = formatDate(new Date(pr.created_at).getTime());
+      const currentDate = formatDate(dayjs(pr.created_at).valueOf());
       const commitsText =
         pr.commits && pr.commits.length > 0
           ? pr.commits

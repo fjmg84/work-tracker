@@ -3,7 +3,7 @@ import { generateReport } from "../lib/csv";
 import { Session, PullRequest, Commit } from "../types";
 import { toast } from "sonner";
 import { useAppStore } from "../store/appStore";
-import dayjs from "dayjs";
+import { dayjs } from "../lib/date";
 
 type ReportPr = PullRequest & { projectId: number };
 type ReportCommit = Commit & { projectId: number };
@@ -220,12 +220,11 @@ export function useReportData() {
 
     for (const s of sessions) {
       if (!s.end_time) continue;
-      const d = new Date(s.start_time);
-      const dayOfWeek = d.getDay() === 0 ? 6 : d.getDay() - 1;
-      const monday = new Date(d);
-      monday.setDate(d.getDate() - dayOfWeek);
-      const weekKey = `${monday.getFullYear()}-${String(monday.getMonth() + 1).padStart(2, "0")}-${String(monday.getDate()).padStart(2, "0")}`;
-      const dayKey = `Día ${d.getDate()}`;
+      const d = dayjs(s.start_time);
+      const dayOfWeek = d.day() === 0 ? 6 : d.day() - 1;
+      const monday = d.subtract(dayOfWeek, "day");
+      const weekKey = monday.format("YYYY-MM-DD");
+      const dayKey = `Día ${d.date()}`;
       const type = sessionType(s);
 
       let projectName = "-";

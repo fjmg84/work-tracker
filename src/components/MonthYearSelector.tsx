@@ -45,7 +45,7 @@ export default function MonthYearSelector({
       >
         <ChevronLeft className="w-4 h-4" />
       </button>
-      <div className="text-center min-w-[140px]">
+      <div className="text-center min-w-35">
         <div className="text-sm font-medium text-text-light dark:text-text-dark">
           {MONTHS[month - 1]}
         </div>

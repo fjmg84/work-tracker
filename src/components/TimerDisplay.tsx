@@ -1,6 +1,7 @@
 import { memo, useEffect, useState } from "react";
 import { Clock } from "lucide-react";
 import type { Session } from "../types";
+import { dayjs } from "../lib/date";
 
 export function formatElapsed(ms: number): string {
   const totalSeconds = Math.floor(ms / 1000);
@@ -34,7 +35,7 @@ const TimerDisplay = memo(function TimerDisplay({
       return;
     }
     const tick = () =>
-      setElapsed(Date.now() - session.start_time - session.total_paused_ms);
+      setElapsed(dayjs().valueOf() - session.start_time - session.total_paused_ms);
     tick();
     const id = setInterval(tick, 1000);
     return () => clearInterval(id);
