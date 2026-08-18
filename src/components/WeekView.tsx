@@ -74,7 +74,7 @@ export default function WeekView({
                       >
                         <div className="flex items-center gap-2 min-w-0">
                           <span
-                            className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-semibold flex-shrink-0 ${
+                            className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-semibold shrink-0 ${
                               agg.type === "meet"
                                 ? "badge-purple"
                                 : "badge-blue"
@@ -96,12 +96,12 @@ export default function WeekView({
                                 ({agg.accountLabel})
                               </span>
                             )}
-                          <span className="text-[10px] text-text-muted-light dark:text-text-muted-dark flex-shrink-0">
+                          <span className="text-[10px] text-text-muted-light dark:text-text-muted-dark shrink-0">
                             {agg.count}{" "}
                             {agg.count === 1 ? "sesión" : "sesiones"}
                           </span>
                         </div>
-                        <span className="text-sm font-medium text-text-light dark:text-text-dark ml-3 flex-shrink-0">
+                        <span className="text-sm font-medium text-text-light dark:text-text-dark ml-3 shrink-0">
                           {Math.floor(agg.minutes / 60)}h {agg.minutes % 60}m
                         </span>
                       </div>
